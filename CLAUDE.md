@@ -29,7 +29,7 @@
 | translate | それ以外 | `harness/spells/translate.md` |
 
 ## Bright Data scrapers(再利用。作り直さないこと)
-- 会社サイト構造化(companyName / tagline / products[] / latestNews): `bdata scraper run <COLLECTOR_ID> https://<domain>/ --pretty`(collector: **未作成 — Step 01 で作成し、ここに id を記入**)
+- 会社サイト構造化(companyName / tagline / products[] / latestNews): `bdata scraper run <COLLECTOR_ID> https://<domain>/ --pretty`(collector: **未作成** — このハーネス環境に `bdata` CLI/Bright Data アカウントアクセスが無く Step 01 では作成できなかった。次エージェントへ持ち越し。詳細は `harness/SETUP.md` の「記録」節)
 - 壊れたら `bdata scraper heal <COLLECTOR_ID> "<症状: 例 products が空>"` → diff 確認 → **承認ゲート** → `bdata scraper approve <COLLECTOR_ID>`
 - 失敗時は collector_id と response_id を必ず標準出力に出す
 - MCP(生 Markdown): `scrape_as_markdown` で `https://{domain}/`, `/about`, `/products`, `/blog|/news`。`search_engine` で `"{domain}" news 2026`
