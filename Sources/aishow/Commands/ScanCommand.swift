@@ -10,25 +10,8 @@ enum ScanCommand {
     }
 
     static func run(_ args: [String]) -> Int32 {
-        // 最前面アプリの取得は自分の UI を出す前に行う(鉄則4)。
-        let frontmost = Frontmost.current()
-
-        let browserInfo = BrowserURL.fetch(app: frontmost.app)
-        let pageInfo = PageProbe.probe(app: frontmost.app)
-        let selectedText = Selection.capture()
-
-        let pack = ContextPack(
-            app: frontmost.app,
-            windowTitle: frontmost.windowTitle,
-            url: browserInfo.url,
-            pageTitle: browserInfo.pageTitle,
-            selectedText: selectedText,
-            focusedInput: pageInfo.focusedInput,
-            hasFormTextarea: pageInfo.hasFormTextarea
-        )
-
-        let site = detect(pack)
-        let result = ScanResult(pack: pack, site: site)
+        let scanned = Scan.perform()
+        let result = ScanResult(pack: scanned.pack, site: scanned.site)
 
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601

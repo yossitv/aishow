@@ -58,6 +58,15 @@ final class DetectTests: XCTestCase {
         XCTAssertEqual(site.workflow, .linkedinDM)
     }
 
+    /// 誤判定防止: `host.contains("linkedin.com")` だと `evil-linkedin.com` のような偽ドメインも
+    /// 拾ってしまうため、`host == "linkedin.com" || host.hasSuffix(".linkedin.com")` の厳密比較にした。
+    func testSpoofedLinkedInDomainIsNotDetected() {
+        let pack = ContextPack(app: "Safari", url: "https://evil-linkedin.com/in/janedoe/")
+        let site = detect(pack)
+        XCTAssertNotEqual(site.kind, .linkedin)
+        XCTAssertNotEqual(site.workflow, .linkedinDM)
+    }
+
     func testSlackChat() throws {
         let pack = try loadPack("06_slack_chat.json")
         let site = detect(pack)

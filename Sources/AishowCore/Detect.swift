@@ -51,7 +51,7 @@ public func detect(_ pack: ContextPack) -> SiteDetection {
     let p = path(from: pack.url)
 
     // linkedin
-    if let host, host.contains("linkedin.com") {
+    if let host, host == "linkedin.com" || host.hasSuffix(".linkedin.com") {
         if p.hasPrefix("/in/") || p.hasPrefix("/messaging/") {
             return SiteDetection(domain: d, kind: .linkedin, workflow: .linkedinDM)
         }
@@ -63,7 +63,7 @@ public func detect(_ pack: ContextPack) -> SiteDetection {
     }
 
     // mail
-    if pack.app == "Mail" || host == "mail.google.com" {
+    if pack.app == "Mail" || host == "mail.google.com" || host?.hasSuffix(".mail.google.com") == true {
         return SiteDetection(domain: d, kind: .mail, workflow: .emailEN)
     }
 
