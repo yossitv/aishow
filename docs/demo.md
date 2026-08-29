@@ -3,7 +3,7 @@
 ## 事前準備(撮影前)
 ```bash
 make harness                          # ターミナル A: TrueForge
-./scripts/register-brightdata.sh      # ターミナル B: Bright Data コネクタ登録(1 回)
+./scripts/setup-harness.sh            # ターミナル B: OpenAI + Bright Data を登録
 make app && open dist/Aishow.app      # メニューバーに杖アイコン
 ```
 - 初回: マイク / Accessibility / Automation を許可(メニューバー →「状態…」に導線)

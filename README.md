@@ -22,7 +22,7 @@ shortcut key + voice ─▶ TrueForge agent(local)─▶ サイト / サービ�
 ```bash
 cp .env.example .env                 # OPENAI_API_KEY, BRIGHTDATA_API_KEY を入れる
 make harness                         # 別ターミナルで TrueForge を起動(http://localhost:8790)
-./scripts/register-brightdata.sh     # Bright Data のホスト型 MCP を TrueForge に登録(1 回だけ)
+./scripts/setup-harness.sh           # OpenAI モデル + Bright Data ホスト型 MCP を TrueForge に登録(冪等)
 swift build && swift test
 
 # CLI(1 コマンドずつ確認できる)
