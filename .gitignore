@@ -1,0 +1,52 @@
+# --- secrets ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+.md
+
+# --- Swift / SPM / Xcode ---
+.build/
+.swiftpm/
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/
+xcuserdata/
+DerivedData/
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+.index-build/
+Package.resolved.lock
+
+# --- app bundle output(make app で生成)---
+dist/
+*.app
+
+# --- Node(TrueForge をローカル起動するときの残骸)---
+node_modules/
+npm-debug.log*
+pnpm-debug.log*
+trueforge.sqlite*
+db.sqlite*
+
+# --- runtime artifacts ---
+recordings/
+*.wav
+*.m4a
+*.caf
+logs/
+*.log
+~/.aishow/
+
+# --- macOS ---
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# --- editors ---
+.vscode/
+.idea/
+*.swp

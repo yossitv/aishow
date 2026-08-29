@@ -1,0 +1,12 @@
+[github_app]
+pr_commands = ["/agentic_describe", "/agentic_review"]
+
+[pr_reviewer]
+inline_comments_severity_threshold = 3   # action_required のみインライン化
+issues_user_guidelines = """
+- 不可逆操作(他アプリへの貼り付け、送信、スクレイパー approve、削除)の前に必ず承認ゲートを通ること
+- 外部 API キー・トークンはコードに直書きしない(環境変数 / .env のみ)
+- クリップボードを使う処理は、失敗時も必ず元の内容を復元すること
+- osascript / CGEvent など OS を操作するコードは、最前面アプリが変わっていないか確認してから実行すること
+- ワークフロー判定(detect)は純粋関数として実装し、フィクスチャでテストすること
+"""
