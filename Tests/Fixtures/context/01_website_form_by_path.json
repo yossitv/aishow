@@ -1,0 +1,9 @@
+{
+  "app": "Google Chrome",
+  "windowTitle": "Contact Us — Acme",
+  "url": "https://www.acme.com/contact",
+  "pageTitle": "Contact Us",
+  "focusedInput": true,
+  "hasFormTextarea": false,
+  "capturedAt": "2026-08-29T00:00:00Z"
+}

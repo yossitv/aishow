@@ -1,0 +1,9 @@
+{
+  "app": "Arc",
+  "windowTitle": "Acme — Home",
+  "url": "https://acme.com/",
+  "pageTitle": "Acme Home",
+  "focusedInput": true,
+  "hasFormTextarea": true,
+  "capturedAt": "2026-08-29T00:00:00Z"
+}
