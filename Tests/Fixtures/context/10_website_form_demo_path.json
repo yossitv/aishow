@@ -1,0 +1,9 @@
+{
+  "app": "Microsoft Edge",
+  "windowTitle": "Request a Demo — Acme",
+  "url": "https://acme.com/request-demo",
+  "pageTitle": "Request a Demo",
+  "focusedInput": true,
+  "hasFormTextarea": false,
+  "capturedAt": "2026-08-29T00:00:00Z"
+}
