@@ -45,6 +45,12 @@ make app && open dist/Aishow.app
 5. **契約**: 承認ポップオーバー(根拠 URL・本文編集・貼り付け先・最前面アプリ変化の警告)。却下理由は同セッションに返して再生成
 6. **発動**: クリップボード退避 → Cmd+V → 復元。**Enter は送らない**
 
+## 実機で通した例(2026-08-29)
+Chrome で `https://brightdata.com/contact` を開いて詠唱「この会社に、うちの音声SDKの話でコールドメッセージ」→ `website_form @ brightdata.com` → TrueForge 上の gpt-5.2 が Bright Data MCP を 14 回呼び、次を返した:
+
+> **sources**: https://docs.brightdata.com/datasets/scrapers/concepts/web-scraper-api-vs-diy
+> **text**: I noticed Bright Data's Web Scraper API highlights 1000+ pre-built, maintained scrapers—impressive coverage. We've built a voice SDK that helps teams add fast, reliable speech UX (streaming STT/TTS, latency tuning, and tooling) to products and internal apps. If voice could complement any of your dashboards or developer tooling, I'd love to share a quick 15-minute overview—who's best to speak with?
+
 ## ドキュメント
 - [docs/idea.md](docs/idea.md) — 要件
 - [docs/steps/](docs/steps/README.md) — 実装 Step(発注書)。1 Step = 1 PR = Qodo レビュー
