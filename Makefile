@@ -26,6 +26,8 @@ app:
 	mkdir -p $(APP)/Contents/MacOS $(APP)/Contents/Resources
 	cp $(BUILD_DIR)/aishow $(APP)/Contents/MacOS/$(APP_NAME)
 	sed -e 's/__BUNDLE_ID__/$(BUNDLE_ID)/' -e 's/__APP_NAME__/$(APP_NAME)/' scripts/Info.plist.template > $(APP)/Contents/Info.plist
+	mkdir -p $(APP)/Contents/Resources/harness
+	rsync -a --exclude='.env' harness/ $(APP)/Contents/Resources/harness/
 	codesign --force --deep --sign "$(SIGN_IDENTITY)" $(APP)
 	@echo "built $(APP)  (open $(APP) で起動)"
 

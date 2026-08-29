@@ -105,13 +105,20 @@ enum TrueForgeClient {
         }
 
         let result = attempt(mcpServers: mcpServerNames)
-        if case .failure = result, !mcpServerNames.isEmpty {
+        if case .failure(let error) = result, !mcpServerNames.isEmpty, isMCPServerNotRegistered(error) {
             FileHandle.standardError.write(
                 "aishow summon: Bright Data コネクタ未登録の可能性 — mcp_servers なしで再試行します\n".data(using: .utf8)!
             )
             return attempt(mcpServers: [])
         }
         return result
+    }
+
+    /// Qodo #7-9: 失敗理由が MCP サーバー未登録のときだけ再試行する。それ以外のエラーはそのまま投げる。
+    private static func isMCPServerNotRegistered(_ error: ClientError) -> Bool {
+        guard case .http(_, let body) = error else { return false }
+        let lowered = body.lowercased()
+        return (lowered.contains("mcp") || lowered.contains("server")) && lowered.contains("not found")
     }
 
     private static func findAgentId(named name: String, in json: Any) -> String? {
@@ -136,6 +143,11 @@ enum TrueForgeClient {
         case .failure(let error):
             return .failure(error)
         }
+    }
+
+    /// 保存済み sessionId が有効か確認する(Qodo #7-8)。404 なら呼び出し側で作り直す。
+    static func getSession(id: String) -> Swift.Result<Void, ClientError> {
+        getJSON(path: "/api/v1/sessions/\(id)").map { _ in () }
     }
 
     // MARK: - turns (SSE)

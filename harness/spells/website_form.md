@@ -1,6 +1,6 @@
 ---
 name: website_form
-description: 企業サイトの問い合わせフォームに、その会社固有の事実を1つ以上引用したコールドメッセージ英文を書き、paste_to_cursor の承認待ちで止まる。ContextPack.url が問い合わせ/デモ/セールス系フォームのときに使う。
+description: 企業サイトの問い合わせフォームに、その会社固有の事実を1つ以上引用したコールドメッセージ英文を書き、```json フェンスで返して人間の承認待ちにする。ContextPack.url が問い合わせ/デモ/セールス系フォームのときに使う。
 ---
 <!--
 TrueForge の Settings → Skills は GitHub インポート(このリポジトリの harness/spells)または貼り付けで登録する(harness/SETUP.md 参照)。
@@ -23,8 +23,8 @@ TrueForge の Settings → Skills は GitHub インポート(このリポジト�
 3. 具体的な事実を **最低 1 つ**選ぶ(製品名 / 直近の発表 / 採用中の職種 / ミッション文)。引用元 URL を控える
 4. フォームの文脈(`pageTitle` / `url` に Contact Sales / Partnership / Support / Demo)に合わせて 1 行目を変える
 5. 本文を書く: 1 行目=なぜ今この会社か(事実の引用)、2 行目=詠唱者の提案(`chant` から)、3 行目=軽い CTA(15 分の会話など)。署名は入れない
-6. 根拠 URL を箇条書き → 本文 → `paste_to_cursor({ text, target: { app, windowTitle } })` を呼ぶ(承認待ち。引数スキーマは `harness/tools.md` 参照。`target` は ContextPack の `app` / `windowTitle` をそのまま渡す)
+6. 根拠 URL と本文を ```json フェンスの `{"sources":[],"text":"","note":""}` のみで返す。貼り付け・送信はアプリ側が人間の承認後に行う。ツールで貼り付けようとしないこと
 
 ## 失敗時
-- サイトが取れない → `search_engine` のスニペットで書く。それも無理なら「調査不足: {domain} の情報が取れませんでした」と返し、`paste_to_cursor` は呼ばない
+- サイトが取れない → `search_engine` のスニペットで書く。それも無理なら note に「調査不足: {domain} の情報が取れませんでした」と書き、text は空文字列にする
 - collector の出力に `products` 等が欠ける → `scraper_heal(collectorId, "<症状>")` を提案し、`scraper_approve` は承認待ちにする

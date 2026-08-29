@@ -129,6 +129,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// 押した瞬間に scan する(自分の UI を出す前)。それから録音開始。
     private func handleHotKeyPress() {
+        // Qodo #7-5: 既に scan〜summon が進行中(または承認待ち)なら新しい開始を無視する。
+        guard !state.isBusy else { return }
+
         // 鉄則4: 最前面アプリの取得は自分の UI を出す前に行う。
         let scan = Pipeline.scanNow()
         pendingScan = scan

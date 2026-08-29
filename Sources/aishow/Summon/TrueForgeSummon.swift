@@ -39,7 +39,17 @@ enum TrueForgeSummon {
 
         let sessionKey = SessionStore.key(domain: site.domain, app: pack.app)
         if let existing = SessionStore.get(key: sessionKey) {
-            return .success(existing)
+            // Qodo #7-8: 保存済み sessionId が TrueForge 側で失効(404)していたら新規作成し直す。
+            switch TrueForgeClient.getSession(id: existing) {
+            case .success:
+                return .success(existing)
+            case .failure(.http(404, _)):
+                break
+            case .failure(.connectionRefused):
+                return .failure(.connectionRefused)
+            case .failure(let error):
+                return .failure(.other("セッション確認に失敗しました: \(error)"))
+            }
         }
 
         switch TrueForgeClient.createSession(agentName: "aishow") {

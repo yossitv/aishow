@@ -37,16 +37,21 @@ final class AppState: ObservableObject {
     /// 直近のエラーメッセージ(あれば Popover に出す)
     @Published var lastError: String?
 
+    /// scan〜summon が進行中、または承認待ちかどうか(ホットキーの多重起動防止用。Qodo #7-5)。
+    @Published var isBusy: Bool = false
+
     func refreshPermissions() {
         permissions = Permissions.check()
     }
 
     func setIdle() {
         currentLine = "待機中(\(HotKey.displayName) で詠唱)"
+        isBusy = false
     }
 
     func setScanning() {
         currentLine = "索敵 ✔"
+        isBusy = true
     }
 
     func setRecording() {
@@ -83,5 +88,6 @@ final class AppState: ObservableObject {
     func setError(_ message: String) {
         lastError = message
         currentLine = "エラー"
+        isBusy = false
     }
 }
