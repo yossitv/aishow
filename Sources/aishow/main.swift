@@ -13,6 +13,13 @@ import Foundation
 let args = Array(CommandLine.arguments.dropFirst())
 let rest = Array(args.dropFirst())
 
+if args.first == nil {
+    // main.swift のトップレベルはメインスレッドで実行されるため isolation を仮定してよい。
+    MainActor.assumeIsolated {
+        MenuBarApp.run() // Never returns
+    }
+}
+
 let status: Int32
 switch args.first {
 case "scan":   status = ScanCommand.run(rest)
@@ -21,9 +28,6 @@ case "chant":  status = ChantCommand.run(rest)
 case "summon": status = SummonCommand.run(rest)
 case "version", "--version", "-v":
     print("aishow \(Aishow.version)"); status = 0
-case nil:
-    // Step 6 で MenuBarApp.run() に置き換える
-    print("aishow \(Aishow.version): 常駐モードは Step 6 で実装。`aishow help` を参照"); status = 0
 case "help", "--help", "-h":
     print("""
     aishow \(Aishow.version) — 声で詠唱すると、AI エージェントが現れて仕事をする
