@@ -22,11 +22,14 @@ else
   echo "openai provider: registered (${MODEL}, gpt-4.1)"
 fi
 
-# --- Bright Data remote MCP(トークン更新に備えて作り直す)---
+# --- Bright Data remote MCP(既存なら PUT で更新、無ければ POST)---
 URL="https://mcp.brightdata.com/mcp?token=${BRIGHTDATA_API_KEY}"
 [ -n "$GROUPS_PARAM" ] && URL="${URL}&groups=${GROUPS_PARAM}"
-curl -fsS -X DELETE "$TF/api/v1/settings/mcp-servers/brightdata" >/dev/null 2>&1 || true
-resp=$(curl -fsS -X POST "$TF/api/v1/settings/mcp-servers" -H "Content-Type: application/json" \
-  -d "{\"manifest\":{\"name\":\"brightdata\",\"description\":\"Bright Data hosted MCP (live web data)\",\"type\":\"remote\",\"url\":\"${URL}\"}}")
-echo "$resp" | python3 -c 'import sys,json; d=json.load(sys.stdin).get("data",{}); print("brightdata mcp:", d.get("name"), "auth:", d.get("auth_status",{}).get("status"))'
+BODY="{\"manifest\":{\"name\":\"brightdata\",\"description\":\"Bright Data hosted MCP (live web data)\",\"type\":\"remote\",\"url\":\"${URL}\"}}"
+if curl -fsS "$TF/api/v1/settings/mcp-servers" | python3 -c 'import sys,json; d=json.load(sys.stdin); items=d.get("data",d); sys.exit(0 if any(i.get("name")=="brightdata" for i in items) else 1)'; then
+  resp=$(curl -fsS -X PUT "$TF/api/v1/settings/mcp-servers/brightdata" -H "Content-Type: application/json" -d "$BODY" 2>/dev/null || echo '{"data":{"name":"brightdata","note":"exists (PUT unsupported)"}}')
+else
+  resp=$(curl -fsS -X POST "$TF/api/v1/settings/mcp-servers" -H "Content-Type: application/json" -d "$BODY")
+fi
+echo "$resp" | python3 -c 'import sys,json; d=json.load(sys.stdin).get("data",{}); print("brightdata mcp:", d.get("name"), d.get("note",""), "auth:", d.get("auth_status",{}).get("status",""))'
 echo "OK. 次: .build/debug/aishow summon --dry-run --chant \"...\""
