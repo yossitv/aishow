@@ -150,16 +150,18 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 
         state.setTranscribing()
 
-        Task {
-            switch Transcriber.transcribe(fileURL: audioURL) {
+        // Transcriber.transcribe は同期・ブロッキング(semaphore 待ち)なので、
+        // MainActor 上の Task で直接呼ぶと文字起こし中 UI が固まる。バックグラウンドに逃がす。
+        Task.detached {
+            let result = Transcriber.transcribe(fileURL: audioURL)
+            try? FileManager.default.removeItem(at: audioURL)
+            switch result {
             case .success(let chant):
-                try? FileManager.default.removeItem(at: audioURL)
-                await runSummon(scan: scan, chant: chant)
+                await self.runSummon(scan: scan, chant: chant)
             case .failure(let error):
-                try? FileManager.default.removeItem(at: audioURL)
                 await MainActor.run {
-                    state.setError("文字起こしに失敗しました: \(error)")
-                    state.setIdle()
+                    self.state.setError("文字起こしに失敗しました: \(error)")
+                    self.state.setIdle()
                 }
             }
         }

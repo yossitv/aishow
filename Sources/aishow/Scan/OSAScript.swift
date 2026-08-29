@@ -14,12 +14,20 @@ enum OSAScript {
         process.standardOutput = outPipe
         process.standardError = errPipe
 
+        let semaphore = DispatchSemaphore(value: 0)
+        process.terminationHandler = { _ in semaphore.signal() }
+
         do {
             try process.run()
         } catch {
             return nil
         }
-        process.waitUntilExit()
+
+        // osascript が固まって scan 全体を止めないよう、3 秒でタイムアウトして強制終了する。
+        if semaphore.wait(timeout: .now() + 3) == .timedOut {
+            process.terminate()
+            return nil
+        }
 
         guard process.terminationStatus == 0 else { return nil }
 

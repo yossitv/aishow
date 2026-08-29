@@ -10,6 +10,8 @@ struct ApprovalView: View {
     var onReject: () -> Void
 
     @State private var editedText: String
+    /// 最前面が scan 時と食い違う状態で 1 回警告を出した後、「それでも貼る」の 2 回目クリックを待っている。
+    @State private var confirmedDespiteMismatch = false
 
     init(approval: PendingApproval, onApprove: @escaping (String) -> Void, onReject: @escaping () -> Void) {
         self.approval = approval
@@ -18,9 +20,10 @@ struct ApprovalView: View {
         _editedText = State(initialValue: approval.proposal.text)
     }
 
-    /// 承認しようとしている今この瞬間の最前面アプリ。scan 時と違えば警告する。
+    /// 承認しようとしている今この瞬間の最前面アプリ・ウィンドウタイトルが scan 時と違えば警告する。
     private var frontmostChanged: Bool {
-        Frontmost.current().app != approval.scannedApp
+        let current = Frontmost.current()
+        return current.app != approval.scannedApp || current.windowTitle != approval.pack.windowTitle
     }
 
     var body: some View {
@@ -47,8 +50,8 @@ struct ApprovalView: View {
                     .font(.caption)
             }
 
-            if frontmostChanged {
-                Text("⚠️ 最前面アプリが索敵時(\(approval.scannedApp))と異なります。貼り付け先を確認してください。")
+            if frontmostChanged && !confirmedDespiteMismatch {
+                Text("⚠️ 最前面アプリ/ウィンドウが索敵時(\(approval.scannedApp))と異なります。貼り付け先を確認してください。")
                     .font(.caption)
                     .foregroundColor(.red)
             }
@@ -60,8 +63,14 @@ struct ApprovalView: View {
             HStack {
                 Button("却下") { onReject() }
                 Spacer()
-                Button("承認") { onApprove(editedText) }
-                    .keyboardShortcut(.defaultAction)
+                if frontmostChanged && !confirmedDespiteMismatch {
+                    // 1 回目のクリックでは貼り付けず、警告に同意させるだけ(2 回目のクリックで実行)。
+                    Button("それでも貼る") { confirmedDespiteMismatch = true }
+                        .keyboardShortcut(.defaultAction)
+                } else {
+                    Button("承認") { onApprove(editedText) }
+                        .keyboardShortcut(.defaultAction)
+                }
             }
         }
         .padding(12)

@@ -21,7 +21,7 @@ enum Env {
 
         var result: [String: String] = [:]
         for rawLine in content.split(separator: "\n", omittingEmptySubsequences: false) {
-            var line = rawLine.trimmingCharacters(in: .whitespaces)
+            var line = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !line.isEmpty, !line.hasPrefix("#") else { continue }
             if line.hasPrefix("export ") {
                 line = String(line.dropFirst("export ".count)).trimmingCharacters(in: .whitespaces)
