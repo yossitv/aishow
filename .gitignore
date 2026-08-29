@@ -34,6 +34,7 @@ db.sqlite*
 # --- runtime artifacts ---
 recordings/
 *.wav
+!Tests/Fixtures/audio/*.wav
 *.m4a
 *.caf
 logs/
