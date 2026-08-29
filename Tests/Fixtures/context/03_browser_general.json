@@ -1,0 +1,9 @@
+{
+  "app": "Google Chrome",
+  "windowTitle": "Acme — Products",
+  "url": "https://www.acme.com/products",
+  "pageTitle": "Products",
+  "focusedInput": false,
+  "hasFormTextarea": false,
+  "capturedAt": "2026-08-29T00:00:00Z"
+}
