@@ -23,7 +23,7 @@ struct CompletedItem: Identifiable {
 @MainActor
 final class AppState: ObservableObject {
     /// 「いま」に出す 1 行(空なら待機中)
-    @Published var currentLine: String = "待機中(Option+Space で詠唱)"
+    @Published var currentLine: String = "待機中(\(HotKey.displayName) で詠唱)"
     /// 「待ち」に出す 1 行(承認待ちの workflow 名など)
     @Published var pendingLine: String = ""
     /// 「済み」の直近 1 件
@@ -42,7 +42,7 @@ final class AppState: ObservableObject {
     }
 
     func setIdle() {
-        currentLine = "待機中(Option+Space で詠唱)"
+        currentLine = "待機中(\(HotKey.displayName) で詠唱)"
     }
 
     func setScanning() {

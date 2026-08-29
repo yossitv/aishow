@@ -1,7 +1,10 @@
 import AppKit
 import Foundation
 
-/// グローバルホットキー `Option+Space`。
+/// グローバルホットキー(既定 `Option+Space`)。
+///
+/// 修飾キーは `UserDefaults` の `hotKeyModifiers`(例: `"control+option"`)で変更できる。
+/// ChatGPT デスクトップ等が `Option+Space` を占有している環境向け。
 ///
 /// 発注書の鉄則(ホットキー押下 → scan の順序を崩さない): `onPress` は
 /// **自分の UI を出す前**に呼ばれる前提で、呼び出し側(`MenuBarApp`)がまず
@@ -11,6 +14,37 @@ import Foundation
 /// が無いとイベントを受け取れない。権限が無い場合は `onPermissionMissing` を呼ぶ。
 final class HotKey {
     private static let spaceKeyCode: UInt16 = 49
+    static let modifiersDefaultsKey = "hotKeyModifiers"
+
+    /// `UserDefaults` から修飾キーを読む。未設定・不正なら `.option`。
+    static func configuredModifiers() -> NSEvent.ModifierFlags {
+        let raw = UserDefaults.standard.string(forKey: modifiersDefaultsKey) ?? "option"
+        var flags: NSEvent.ModifierFlags = []
+        for part in raw.lowercased().split(whereSeparator: { "+ ,".contains($0) }) {
+            switch part {
+            case "option", "alt", "opt": flags.insert(.option)
+            case "control", "ctrl": flags.insert(.control)
+            case "command", "cmd": flags.insert(.command)
+            case "shift": flags.insert(.shift)
+            default: break
+            }
+        }
+        return flags.isEmpty ? [.option] : flags
+    }
+
+    /// 表示用ラベル(例: `Control+Option+Space`)。
+    static var displayName: String {
+        let f = configuredModifiers()
+        var parts: [String] = []
+        if f.contains(.control) { parts.append("Control") }
+        if f.contains(.option) { parts.append("Option") }
+        if f.contains(.shift) { parts.append("Shift") }
+        if f.contains(.command) { parts.append("Command") }
+        parts.append("Space")
+        return parts.joined(separator: "+")
+    }
+
+    private let requiredModifiers = HotKey.configuredModifiers()
 
     private var monitor: Any?
     private var isDown = false
@@ -42,8 +76,9 @@ final class HotKey {
 
     private func handle(_ event: NSEvent) {
         guard event.keyCode == HotKey.spaceKeyCode else { return }
-        guard event.modifierFlags.contains(.option) else {
-            // Option を離した/押していない状態で Space が来た場合、押しっぱなし扱いを解除する。
+        let mods = event.modifierFlags.intersection([.option, .control, .command, .shift])
+        guard mods == requiredModifiers else {
+            // 修飾キーを離した/押していない状態で Space が来た場合、押しっぱなし扱いを解除する。
             if isDown, event.type == .keyUp {
                 isDown = false
                 onRelease?()
