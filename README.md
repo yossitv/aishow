@@ -18,21 +18,40 @@ shortcut key + voice ─▶ TrueForge agent(local)─▶ サイト / サービ�
                 → 承認 → フォームに挿入
 ```
 
-## 使い方(開発中)
+## 使い方
 ```bash
-cp .env.example .env            # OPENAI_API_KEY, BRIGHTDATA_API_KEY を入れる
-make harness                    # 別ターミナルで TrueForge を起動(http://localhost:8790)→ harness/SETUP.md
+cp .env.example .env                 # OPENAI_API_KEY, BRIGHTDATA_API_KEY を入れる
+make harness                         # 別ターミナルで TrueForge を起動(http://localhost:8790)
+./scripts/register-brightdata.sh     # Bright Data のホスト型 MCP を TrueForge に登録(1 回だけ)
 swift build && swift test
-.build/debug/aishow scan --json # 索敵
-.build/debug/aishow summon      # 詠唱 → 召喚 → 承認 → 発動
-make app && open dist/Aishow.app  # メニューバー常駐
+
+# CLI(1 コマンドずつ確認できる)
+.build/debug/aishow scan --json                       # 索敵: 最前面アプリ・URL・選択テキスト → workflow 判定
+.build/debug/aishow chant --file Tests/Fixtures/audio/sample-ja.wav   # 詠唱: OpenAI STT
+echo "hello" | .build/debug/aishow cast --app com.apple.TextEdit      # 発動: 貼り付け(承認後にのみ使う)
+.build/debug/aishow summon --chant "この会社に音声 SDK の話でコールドメッセージ"   # 召喚 → 承認(y/e/n)→ 発動
+.build/debug/aishow summon --dry-run --chant "..."   # 提案の表示まで(貼り付けなし)
+
+# メニューバー常駐(ホットキー Option+Space を押しながら話す)
+make app && open dist/Aishow.app
 ```
+初回起動でマイク / Accessibility / Automation の許可が要る(メニューバーの「状態…」に導線)。`aishow` エージェントは初回 `summon` 時に `harness/spells/*.md` から自動作成・更新される。
+
+## 動作の流れ
+1. **索敵**: ホットキー押下の瞬間に最前面アプリ・ウィンドウタイトル・ブラウザ URL・選択テキストを取得(自分の UI を出す前に)
+2. **特定**: `detect()`(純粋関数・フィクスチャテスト)が `website_form / linkedin_dm / casual_en / email_en / translate` を決める
+3. **詠唱**: push-to-talk 録音 → OpenAI `gpt-4o-transcribe`
+4. **召喚**: TrueForge のセッション(ドメインごとに永続)へ workflow + ContextPack + 詠唱を送る。エージェントが Bright Data MCP でサイトを調査し `{sources, text}` を返す。SSE を「いま / 待ち / 済み」として表示
+5. **契約**: 承認ポップオーバー(根拠 URL・本文編集・貼り付け先・最前面アプリ変化の警告)。却下理由は同セッションに返して再生成
+6. **発動**: クリップボード退避 → Cmd+V → 復元。**Enter は送らない**
 
 ## ドキュメント
 - [docs/idea.md](docs/idea.md) — 要件
 - [docs/steps/](docs/steps/README.md) — 実装 Step(発注書)。1 Step = 1 PR = Qodo レビュー
 - [docs/kanban.xlsx](docs/kanban.xlsx) — 進捗(`python3 scripts/kanban.py`)
 - [harness/SETUP.md](harness/SETUP.md) — TrueForge / OpenAI / Bright Data の設定
+- [harness/trueforge-api.md](harness/trueforge-api.md) — 実機で確認した TrueForge の HTTP/SSE プロトコル(snake_case、error は turn.done 内、MCP は remote URL 専用)
+- PR 一覧(すべて Qodo `/agentic_review` 済み): [#1 harness](https://github.com/yossitv/aishow/pull/1) · [#2 scan](https://github.com/yossitv/aishow/pull/2) · [#3 cast](https://github.com/yossitv/aishow/pull/3) · [#4 chant](https://github.com/yossitv/aishow/pull/4) · [#5 summon](https://github.com/yossitv/aishow/pull/5) · [#6 menubar](https://github.com/yossitv/aishow/pull/6)
 - [CLAUDE.md](CLAUDE.md) — 開発規約・Bright Data collector のピン留め
 
 ## スポンサー製品の使いどころ
