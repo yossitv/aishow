@@ -323,6 +323,16 @@ private final class SSEStreamer: NSObject, URLSessionDataDelegate {
                   let raw = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
                   let type = raw["type"] as? String else { continue }
             let event = decode(type: type, raw: raw)
+            // 実機確認(2026-08-29): SSE の `model.message` は本文なしで先頭に来て、本文は
+            // `model.message.delta` の差分と `turn.done.state.output.content` に入る。
+            // 最終本文を取りこぼさないよう、turn.done の直前に確定本文を model.message として流す。
+            if type == "turn.done",
+               let state = raw["state"] as? [String: Any],
+               let output = state["output"] as? [String: Any],
+               let finalContent = output["content"] as? String,
+               !finalContent.isEmpty {
+                onEvent(.modelMessage(content: finalContent, toolCalls: []))
+            }
             onEvent(event)
             if case .turnDone(let status, let message) = event {
                 if status != "done" {

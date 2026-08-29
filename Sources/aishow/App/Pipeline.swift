@@ -7,13 +7,6 @@ struct ScanResult {
     var site: SiteDetection
 }
 
-/// TrueForge(ハーネス)が返す提案。承認前の草稿。
-struct Proposal {
-    var sources: [String]
-    var text: String
-    var note: String?
-}
-
 /// TrueForge との結線ポイント。Step 05 の実装はこのプロトコルに適合させて
 /// `Pipeline.summonRunner` を差し替えるだけで良い(呼び出し側の変更は不要)。
 protocol SummonRunner {
@@ -51,9 +44,13 @@ struct StubSummonRunner: SummonRunner {
 
 /// 索敵〜召喚のパイプライン。ホットキーのハンドラから呼ばれる。
 enum Pipeline {
-    /// Step 05 の TrueForge クライアントに差し替える唯一の場所。
-    /// `SummonRunner` に適合する実装を用意し、ここへ代入するだけで良い。
-    static var summonRunner: SummonRunner = StubSummonRunner()
+    /// Step 05/07 の TrueForge クライアント。`AISHOW_STUB=1` のときだけダミーに差し替える。
+    static var summonRunner: SummonRunner = {
+        if Env.get("AISHOW_STUB") == "1" {
+            return StubSummonRunner()
+        }
+        return TrueForgeSummonRunner()
+    }()
 
     /// 索敵する。**自分の UI を出す前に呼ぶこと**(鉄則4)。
     static func scanNow() -> ScanResult {

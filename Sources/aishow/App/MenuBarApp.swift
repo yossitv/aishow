@@ -26,6 +26,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
     /// ホットキー押下の瞬間に取った索敵結果(離すまで保持する)。
     private var pendingScan: ScanResult?
 
+    /// 却下 → 再生成の残り回数(1 回の召喚あたり最大 2 回)。
+    private var pendingRetriesLeft = 2
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupStatusItem()
         setupHotKey()
@@ -163,6 +166,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func runSummon(scan: ScanResult, chant: String) async {
+        pendingRetriesLeft = 2
         await MainActor.run {
             state.setSummoning(scan.site.workflow.rawValue, domain: scan.site.domain)
         }
@@ -214,9 +218,51 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         popover?.performClose(nil)
     }
 
+    /// 却下: UI に理由入力が無いので固定文で再生成する(最大 2 回)。
+    /// `TrueForgeSummonRunner` 以外(stub 等)では再生成をサポートせず、そのまま idle に戻す。
     private func reject() {
-        state.pendingApproval = nil
-        state.setIdle()
+        guard let approval = state.pendingApproval,
+              pendingRetriesLeft > 0,
+              let runner = Pipeline.summonRunner as? TrueForgeSummonRunner else {
+            state.pendingApproval = nil
+            state.setIdle()
+            popover?.performClose(nil)
+            return
+        }
+
+        pendingRetriesLeft -= 1
         popover?.performClose(nil)
+        state.setSummoning(approval.site.workflow.rawValue, domain: approval.site.domain)
+
+        Task {
+            do {
+                let proposal = try await runner.regenerate(
+                    pack: approval.pack,
+                    site: approval.site,
+                    reason: "却下。別案を",
+                    onEvent: { [weak self] text in
+                        Task { @MainActor in
+                            self?.state.setEvent(text)
+                        }
+                    }
+                )
+                await MainActor.run {
+                    let newApproval = PendingApproval(
+                        pack: approval.pack,
+                        site: approval.site,
+                        chant: approval.chant,
+                        proposal: proposal,
+                        scannedApp: approval.scannedApp
+                    )
+                    state.setAwaitingApproval(newApproval)
+                    presentApprovalPopover(newApproval)
+                }
+            } catch {
+                await MainActor.run {
+                    state.setError("再生成に失敗しました: \(error)")
+                    state.setIdle()
+                }
+            }
+        }
     }
 }

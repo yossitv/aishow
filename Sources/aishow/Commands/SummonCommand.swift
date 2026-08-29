@@ -45,84 +45,35 @@ enum SummonCommand {
             return 64
         }
 
-        // 3〜4. TrueForge 未起動なら案内して終了、起動していれば ensureAgent
-        let model = Env.get("AISHOW_MODEL") ?? "openai/gpt-5.2"
-        let mcpServers = (Env.get("AISHOW_MCP_SERVERS") ?? "brightdata")
-            .split(separator: ",")
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty }
-
-        let instructions = SpellBook.buildInstructions()
-
-        switch TrueForgeClient.ensureAgent(instructions: instructions, model: model, mcpServerNames: mcpServers) {
-        case .success:
-            break
+        // 3〜4. TrueForge 未起動なら案内して終了、起動していれば ensureAgent → セッション
+        let sessionId: String
+        switch TrueForgeSummon.ensureSession(site: scanned.site, pack: scanned.pack) {
+        case .success(let id):
+            sessionId = id
         case .failure(.connectionRefused):
             writeErr("aishow summon: TrueForge に接続できません。`make harness` で起動してください。")
             return 69
         case .failure(let error):
-            writeErr("aishow summon: エージェントの準備に失敗しました: \(error)")
+            writeErr("aishow summon: \(error)")
             return 1
         }
 
-        // セッション(ドメイン単位で継続)
-        let sessionKey = SessionStore.key(domain: scanned.site.domain, app: scanned.pack.app)
-        let sessionId: String
-        if let existing = SessionStore.get(key: sessionKey) {
-            sessionId = existing
-        } else {
-            switch TrueForgeClient.createSession(agentName: "aishow") {
-            case .success(let id):
-                sessionId = id
-                SessionStore.set(key: sessionKey, sessionId: id)
-            case .failure(.connectionRefused):
-                writeErr("aishow summon: TrueForge に接続できません。`make harness` で起動してください。")
-                return 69
-            case .failure(let error):
-                writeErr("aishow summon: セッション作成に失敗しました: \(error)")
-                return 1
-            }
-        }
-
         // 5. ターン送信 → ストリーム表示
-        let turnBody = buildTurnBody(workflow: scanned.site.workflow.rawValue, pack: scanned.pack, chant: text)
+        let turnBody = TrueForgeSummon.buildTurnBody(workflow: scanned.site.workflow.rawValue, pack: scanned.pack, chant: text)
 
-        struct StringError: Error { let text: String }
-
-        func sendAndCollect(message: String) -> Swift.Result<Proposal, StringError> {
-            var collectedMessages: [String] = []
-            let result = TrueForgeClient.sendTurn(
-                sessionId: sessionId,
-                input: [["type": "user.message", "content": message]],
-                onEvent: { event in handle(event: event, collectedMessages: &collectedMessages) }
-            )
-            switch result {
-            case .failure(.connectionRefused):
-                return .failure(StringError(text: "__connection_refused__"))
-            case .failure(let error):
-                return .failure(StringError(text: "\(error)"))
-            case .success:
-                break
-            }
-            let joined = collectedMessages.joined(separator: "\n")
-            switch ProposalParser.parse(fromFinalMessage: joined) {
-            case .success(let parsed):
-                return .success(parsed)
-            case .failure:
-                return .failure(StringError(text: "提案(```json ブロック)を解析できませんでした。応答: \(joined.prefix(400))"))
-            }
+        func sendAndCollect(message: String) -> Swift.Result<Proposal, TrueForgeSummon.SummonError> {
+            TrueForgeSummon.sendAndCollect(sessionId: sessionId, message: message, onEvent: { writeErr($0) })
         }
 
         var currentProposal: Proposal
         switch sendAndCollect(message: turnBody) {
         case .success(let parsed):
             currentProposal = parsed
+        case .failure(.connectionRefused):
+            writeErr("aishow summon: TrueForge に接続できません。`make harness` で起動してください。")
+            return 69
         case .failure(let error):
-            if error.text == "__connection_refused__" {
-                writeErr("aishow summon: TrueForge に接続できません。`make harness` で起動してください。")
-                return 69
-            }
-            writeErr("aishow summon: \(error.text)")
+            writeErr("aishow summon: \(error)")
             return 1
         }
 
@@ -188,52 +139,14 @@ enum SummonCommand {
                         writeErr("aishow summon: 調査不足のため貼り付けを見送ります: \(currentProposal.note ?? "(理由なし)")")
                         return 1
                     }
+                case .failure(.connectionRefused):
+                    writeErr("aishow summon: TrueForge に接続できません。`make harness` で起動してください。")
+                    return 69
                 case .failure(let error):
-                    if error.text == "__connection_refused__" {
-                        writeErr("aishow summon: TrueForge に接続できません。`make harness` で起動してください。")
-                        return 69
-                    }
-                    writeErr("aishow summon: \(error.text)")
+                    writeErr("aishow summon: \(error)")
                     return 1
                 }
             }
-        }
-    }
-
-    private static func buildTurnBody(workflow: String, pack: ContextPack, chant: String) -> String {
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        let contextJSON: String
-        if let data = try? encoder.encode(pack), let str = String(data: data, encoding: .utf8) {
-            contextJSON = str
-        } else {
-            contextJSON = "{}"
-        }
-        return "workflow: \(workflow)\ncontext: \(contextJSON)\nchant: \(chant)"
-    }
-
-    /// SSE イベントを「いま / 済み」として stderr に流し、`model.message` の本文を蓄積する。
-    private static func handle(event: TrueForgeEvent, collectedMessages: inout [String]) {
-        switch event {
-        case .modelMessage(let content, let toolCalls):
-            if let content, !content.isEmpty {
-                collectedMessages.append(content)
-            }
-            for toolCall in toolCalls {
-                writeErr("いま: \(toolCall.name ?? toolCall.id ?? "tool")")
-            }
-        case .toolResponse(let toolCallId):
-            writeErr("済み: \(toolCallId ?? "tool")")
-        case .toolApprovalRequired(_, let toolCalls):
-            for toolCall in toolCalls {
-                writeErr("いま: (承認待ち) \(toolCall.id)")
-            }
-        case .turnDone(let status, let message):
-            if status != "done" {
-                writeErr("済み: turn.done status=\(status) \(message ?? "")")
-            }
-        default:
-            break
         }
     }
 
