@@ -73,8 +73,23 @@ enum Selection {
         keyDown?.flags = .maskCommand
         let keyUp = CGEvent(keyboardEventSource: source, virtualKey: keyCodeC, keyDown: false)
         keyUp?.flags = .maskCommand
+        // 自分が送った合成キーだと HotKey が見分けられるように印を付ける
+        // (⌘ 長押しモードで、この ⌘C を「別キー押下」と誤認して録音を破棄していた)。
+        keyDown?.setIntegerValueField(.eventSourceUserData, value: SyntheticKeyEvent.marker)
+        keyUp?.setIntegerValueField(.eventSourceUserData, value: SyntheticKeyEvent.marker)
 
         keyDown?.post(tap: .cghidEventTap)
         keyUp?.post(tap: .cghidEventTap)
+    }
+}
+
+/// Aishow 自身が送る合成キーイベント(scan の ⌘C、cast の ⌘V)の識別子。
+enum SyntheticKeyEvent {
+    /// `CGEventField.eventSourceUserData` に入れる値("AISH")。
+    static let marker: Int64 = 0x4149_5348
+
+    /// このイベントは Aishow が送った合成キーか。
+    static func isOwn(_ event: NSEvent) -> Bool {
+        event.cgEvent?.getIntegerValueField(.eventSourceUserData) == marker
     }
 }

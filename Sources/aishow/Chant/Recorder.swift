@@ -70,7 +70,9 @@ enum Recorder {
                 return buffer
             }
 
-            if status == .haveData || status == .endOfStream, let channelData = converted.int16ChannelData {
+            // 入力ブロックが 2 回目に .noDataNow を返すため、status は .inputRanDry になることが多い。
+            // その場合も converted には変換済みフレームが入っているので、.error 以外はすべて取り込む。
+            if status != .error, converted.frameLength > 0, let channelData = converted.int16ChannelData {
                 let frames = Int(converted.frameLength)
                 let bytes = Data(bytes: channelData[0], count: frames * MemoryLayout<Int16>.size)
                 pcmBox.append(bytes)
