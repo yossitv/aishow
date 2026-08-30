@@ -26,7 +26,29 @@ final class HotKey {
         let keyCodes: Set<UInt16>
         let flag: NSEvent.ModifierFlags
         let name: String
+        /// 左右いずれかの ⌘ だけを見るとき、デバイス固有ビット(NX_DEVICELCMDKEYMASK / NX_DEVICERCMDKEYMASK)で判定する。
+        /// 集約フラグ `.command` だと、反対側の ⌘ を押したまま設定側を離しても「押されたまま」に見えるため(Qodo #11-2)。
+        let deviceMask: UInt?
+
+        init(keyCodes: Set<UInt16>, flag: NSEvent.ModifierFlags, name: String, deviceMask: UInt? = nil) {
+            self.keyCodes = keyCodes
+            self.flag = flag
+            self.name = name
+            self.deviceMask = deviceMask
+        }
+
+        /// このイベント時点で対象キーが押されているか。
+        func isHeld(in event: NSEvent) -> Bool {
+            if let deviceMask {
+                return event.modifierFlags.rawValue & deviceMask != 0
+            }
+            return event.modifierFlags.contains(flag)
+        }
     }
+
+    /// NX_DEVICELCMDKEYMASK / NX_DEVICERCMDKEYMASK(IOKit/hidsystem/IOLLEvent.h)。
+    private static let leftCommandDeviceMask: UInt = 0x0000_0008
+    private static let rightCommandDeviceMask: UInt = 0x0000_0010
 
     /// `UserDefaults` の `hotKeyModifiers` が単独長押しモードを指していればその定義を返す。
     /// - `fn` / `function` / `globe`: Fn(🌐)キー
@@ -36,13 +58,13 @@ final class HotKey {
         let raw = (UserDefaults.standard.string(forKey: modifiersDefaultsKey) ?? "").lowercased()
         switch raw {
         case "fn", "function", "globe":
-            return HoldKey(keyCodes: [functionKeyCode], flag: .function, name: "Hold Fn (🌐)")
+            return HoldKey(keyCodes: [functionKeyCode], flag: .function, name: L10n.t("hotkey.holdFn"))
         case "cmd", "command":
-            return HoldKey(keyCodes: [leftCommandKeyCode, rightCommandKeyCode], flag: .command, name: "Hold ⌘")
+            return HoldKey(keyCodes: [leftCommandKeyCode, rightCommandKeyCode], flag: .command, name: L10n.t("hotkey.holdCmdEither"))
         case "rcmd", "rcommand":
-            return HoldKey(keyCodes: [rightCommandKeyCode], flag: .command, name: "Hold Right ⌘")
+            return HoldKey(keyCodes: [rightCommandKeyCode], flag: .command, name: L10n.t("hotkey.holdRightCmd"), deviceMask: rightCommandDeviceMask)
         case "lcmd", "lcommand":
-            return HoldKey(keyCodes: [leftCommandKeyCode], flag: .command, name: "Hold Left ⌘")
+            return HoldKey(keyCodes: [leftCommandKeyCode], flag: .command, name: L10n.t("hotkey.holdLeftCmd"), deviceMask: leftCommandDeviceMask)
         default:
             return nil
         }
@@ -167,7 +189,7 @@ final class HotKey {
     /// 判定前に離した/別キーを押した場合は何もしない(通常のショートカット操作として素通し)。
     private func handleFlagsChanged(_ event: NSEvent) {
         guard let hold = holdKey, hold.keyCodes.contains(event.keyCode) else { return }
-        let isHeld = event.modifierFlags.contains(hold.flag)
+        let isHeld = hold.isHeld(in: event)
         if isHeld {
             guard !isDown, pendingHold == nil else { return }
             let work = DispatchWorkItem { [weak self] in

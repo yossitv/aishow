@@ -3,18 +3,19 @@ import SwiftUI
 /// メニューバー Popover の常時表示。「いま / 待ち / 済み」の 3 行 + 直近 workflow。
 struct StatusView: View {
     @ObservedObject var state: AppState
+    @ObservedObject private var l10n = L10n.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Aishow").font(.headline)
 
-            row(label: "Now", value: state.currentLine)
+            row(label: L10n.t("status.now"), value: state.currentLine)
                 .glassCard(tint: .blue)
-            row(label: "Pending", value: state.pendingLine.isEmpty ? "-" : state.pendingLine)
+            row(label: L10n.t("status.pending"), value: state.pendingLine.isEmpty ? L10n.t("status.dash") : state.pendingLine)
                 .glassCard(tint: .orange)
             row(
-                label: "Done",
-                value: state.lastCompleted?.summary ?? "-"
+                label: L10n.t("status.done"),
+                value: state.lastCompleted?.summary ?? L10n.t("status.dash")
             )
             .glassCard(tint: .green)
 
@@ -32,7 +33,7 @@ struct StatusView: View {
 
             if HotKey.isFnMode {
                 // Fn(🌐)単独モードの注意書き: システム設定側で🌐キーの既定動作を無効化しないと奪われる。
-                Text("Fn (🌐) mode: Set System Settings → Keyboard → “Press 🌐 key to” = Do Nothing")
+                Text(L10n.t("status.fnModeNote"))
                     .font(.caption2)
                     .foregroundColor(.secondary)
             }
@@ -55,15 +56,15 @@ struct StatusView: View {
 
     private var permissionWarnings: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Permissions needed").font(.caption).foregroundColor(.orange)
+            Text(L10n.t("status.permissionsNeeded")).font(.caption).foregroundColor(.orange)
             if !state.permissions.accessibility {
-                permissionButton(title: "Allow Accessibility…", pane: .accessibility)
+                permissionButton(title: L10n.t("status.allowAccessibility"), pane: .accessibility)
             }
             if !state.permissions.microphone {
-                permissionButton(title: "Allow Microphone…", pane: .microphone)
+                permissionButton(title: L10n.t("status.allowMicrophone"), pane: .microphone)
             }
             if !state.permissions.automation {
-                permissionButton(title: "Allow Automation…", pane: .automation)
+                permissionButton(title: L10n.t("status.allowAutomation"), pane: .automation)
             }
         }
     }
