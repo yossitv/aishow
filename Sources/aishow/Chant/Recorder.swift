@@ -37,6 +37,8 @@ enum Recorder {
 
         let engine = AVAudioEngine()
         let input = engine.inputNode
+        // デバイス指定はフォーマット取得より先に行う(デバイスが変わるとフォーマットも変わるため)。
+        AudioInputDevices.applyPreferredInputDevice(to: input)
         let inputFormat = input.outputFormat(forBus: 0)
 
         guard let outFormat = AVAudioFormat(

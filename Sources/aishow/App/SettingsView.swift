@@ -14,7 +14,26 @@ struct SettingsView: View {
 
     @State private var hotKey: String = UserDefaults.standard.string(forKey: HotKey.modifiersDefaultsKey) ?? "option"
     @State private var targetLanguage: String = Preferences.translateTargetLanguage
+    @State private var microphoneUID: String = Preferences.microphoneDeviceUID ?? ""
+    @State private var microphoneDevices: [AudioInputDevice] = AudioInputDevices.list()
     let onHotKeyChanged: () -> Void
+
+    /// 「System default」の表示名(現在の既定入力が分かれば括弧書きで添える)。
+    private var systemDefaultLabel: String {
+        if let name = AudioInputDevices.defaultInputName() {
+            return "System default (automatic) — currently: \(name)"
+        }
+        return "System default (automatic)"
+    }
+
+    /// 保存済み UID が一覧に無い(デバイスが抜かれている)場合に表示用の choices へ足しておく。
+    private var microphoneChoices: [AudioInputDevice] {
+        var devices = microphoneDevices
+        if !microphoneUID.isEmpty, !devices.contains(where: { $0.uid == microphoneUID }) {
+            devices.append(AudioInputDevice(uid: microphoneUID, name: "\(microphoneUID) (not connected)"))
+        }
+        return devices
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -53,6 +72,24 @@ struct SettingsView: View {
                     .font(.caption).foregroundColor(.secondary)
             }
             .glassCard()
+
+            VStack(alignment: .leading, spacing: 4) {
+                Picker("Microphone", selection: $microphoneUID) {
+                    Text(systemDefaultLabel).tag("")
+                    ForEach(microphoneChoices) { device in
+                        Text(device.name).tag(device.uid)
+                    }
+                }
+                .onChange(of: microphoneUID) { newValue in
+                    Preferences.microphoneDeviceUID = newValue
+                }
+                Text("Pick the built-in microphone to keep AirPods on the high-quality audio profile while listening to music.")
+                    .font(.caption).foregroundColor(.secondary)
+            }
+            .glassCard()
+            .onAppear {
+                microphoneDevices = AudioInputDevices.list()
+            }
         }
         .padding(16)
         .frame(width: 340)
