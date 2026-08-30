@@ -23,7 +23,7 @@ struct CompletedItem: Identifiable {
 @MainActor
 final class AppState: ObservableObject {
     /// 「いま」に出す 1 行(空なら待機中)
-    @Published var currentLine: String = "Ready — hold \(HotKey.displayName) to chant"
+    @Published var currentLine: String = L10n.t("status.ready", HotKey.displayName)
     /// 「待ち」に出す 1 行(承認待ちの workflow 名など)
     @Published var pendingLine: String = ""
     /// 「済み」の直近 1 件
@@ -45,27 +45,27 @@ final class AppState: ObservableObject {
     }
 
     func setIdle() {
-        currentLine = "Ready — hold \(HotKey.displayName) to chant"
+        currentLine = L10n.t("status.ready", HotKey.displayName)
         isBusy = false
     }
 
     func setScanning() {
-        currentLine = "Scanned ✔"
+        currentLine = L10n.t("status.scanned")
         isBusy = true
     }
 
     func setRecording() {
-        currentLine = "Chanting…"
+        currentLine = L10n.t("status.chanting")
     }
 
     func setTranscribing() {
-        currentLine = "Transcribing…"
+        currentLine = L10n.t("status.transcribing")
     }
 
     func setSummoning(_ workflow: String, domain: String?) {
         let site = domain.map { "\(workflow) @ \($0)" } ?? workflow
-        currentLine = "Summoning / \(site)"
-        pendingLine = "Summoning…"
+        currentLine = L10n.t("status.summoning", site)
+        pendingLine = L10n.t("status.summoningPending")
     }
 
     func setEvent(_ text: String) {
@@ -74,7 +74,7 @@ final class AppState: ObservableObject {
 
     func setAwaitingApproval(_ approval: PendingApproval) {
         pendingApproval = approval
-        currentLine = "Awaiting approval"
+        currentLine = L10n.t("status.awaitingApproval")
         pendingLine = "\(approval.site.workflow.rawValue) @ \(approval.site.domain ?? "-")"
     }
 
@@ -84,7 +84,7 @@ final class AppState: ObservableObject {
         pendingApproval = nil
         pendingLine = ""
         lastError = nil
-        currentLine = "Pasted into \(summary) ✔ — review and press Enter yourself"
+        currentLine = L10n.t("status.pastedInto", summary)
         isBusy = false
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
             guard let self, !self.isBusy, self.pendingApproval == nil else { return }
@@ -96,7 +96,7 @@ final class AppState: ObservableObject {
     func setCancelled() {
         pendingApproval = nil
         lastError = nil
-        currentLine = "Cancelled"
+        currentLine = L10n.t("status.cancelled")
         isBusy = false
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
             guard let self, !self.isBusy, self.pendingApproval == nil else { return }
@@ -106,7 +106,7 @@ final class AppState: ObservableObject {
 
     func setError(_ message: String) {
         lastError = message
-        currentLine = "Error"
+        currentLine = L10n.t("status.error")
         isBusy = false
     }
 }

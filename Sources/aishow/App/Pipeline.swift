@@ -32,7 +32,7 @@ struct StubSummonRunner: SummonRunner {
         chant: String,
         onEvent: @escaping (String) -> Void
     ) async throws -> Proposal {
-        onEvent("Summoning…")
+        onEvent(L10n.t("pipeline.summoningStub"))
         try await Task.sleep(nanoseconds: 1_000_000_000)
         return Proposal(
             sources: [],

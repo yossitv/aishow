@@ -34,9 +34,8 @@ final class HUDPanel {
 
     /// `applicationDidFinishLaunching` から呼ぶ。パネル自体は生成するが最初は隠れている。
     func setup() {
-        let panel = makePanel()
-        self.panel = panel
-        installCompactContent()
+        // パネルは初回表示(reflectState で表示条件を満たしたとき)に遅延生成する。
+        // 起動時に UI を作らない = 最前面アプリの取得(鉄則4)より先に UI を出さない(Qodo #11-1)。
 
         // AppState の変化を購読して表示/非表示を切り替える(idle 以外で表示、idle に戻ったら 1.5 秒後に隠す)。
         cancellable = state.objectWillChange.sink { [weak self] _ in
@@ -76,7 +75,7 @@ final class HUDPanel {
     /// 承認 UI 等、`StatusView` をそのまま載せたいときに使う「詳細」モード。
     /// ボタン(ステータスアイテム)が見えない環境で popover の代わりに使う。
     func showDetail(content: AnyView) {
-        guard let panel else { return }
+        let panel = ensurePanel()
         isShowingDetail = true
         let hosting = NSHostingView(rootView: content.frame(width: 320))
         panel.contentView = hosting
@@ -111,21 +110,30 @@ final class HUDPanel {
         outsideClickMonitor = nil
     }
 
+    /// パネルを(まだ無ければ)生成して返す。
+    private func ensurePanel() -> NSPanel {
+        if let panel { return panel }
+        let panel = makePanel()
+        self.panel = panel
+        installCompactContent()
+        return panel
+    }
+
     private func reflectState() {
-        guard let panel else { return }
         guard !isShowingDetail else { return } // 詳細モード表示中は compact の自動表示/非表示ロジックを無視
         hideWorkItem?.cancel()
 
         if state.isBusy || state.pendingApproval != nil || state.lastError != nil {
+            let panel = ensurePanel()
             reposition(panel: panel, size: panel.contentView?.fittingSize ?? NSSize(width: 320, height: 44))
             panel.orderFrontRegardless()
         } else {
-            // idle: 1.5 秒後に隠す(直後の完了メッセージなどをすぐ消さない)。
-            let work = DispatchWorkItem { [weak panel] in
-                panel?.orderOut(nil)
+            // idle: 3 秒後に隠す。AppState.setCompleted / setCancelled が完了文言を 2.5 秒見せるので、それより長くする(Qodo #11-3)。
+            let work = DispatchWorkItem { [weak self] in
+                self?.panel?.orderOut(nil)
             }
             hideWorkItem = work
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5, execute: work)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0, execute: work)
         }
     }
 
@@ -144,6 +152,7 @@ final class HUDPanel {
 /// HUD の通常表示: 「いま」の 1 行 + エラー(あれば)。
 private struct HUDCompactView: View {
     @ObservedObject var state: AppState
+    @ObservedObject private var l10n = L10n.shared
     let onCancel: () -> Void
 
     private var canCancel: Bool {
@@ -171,7 +180,7 @@ private struct HUDCompactView: View {
                         .foregroundColor(.secondary)
                 }
                 .buttonStyle(.plain)
-                .help("Cancel")
+                .help(L10n.t("hud.cancel"))
             }
         }
         .padding(.horizontal, 14)

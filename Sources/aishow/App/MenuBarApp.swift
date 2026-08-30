@@ -1,5 +1,6 @@
 import AishowCore
 import AppKit
+import Combine
 import SwiftUI
 
 /// メニューバー常駐アプリの殻。`aishow` を引数なしで起動するとこれが動く。
@@ -68,23 +69,37 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
 
     // MARK: - Status item / popover
 
+    private var languageCancellable: AnyCancellable?
+
     private func setupStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         if let button = item.button {
             button.image = NSImage(systemSymbolName: "wand.and.stars", accessibilityDescription: "Aishow")
         }
 
+        statusItem = item
+        rebuildMenu()
+
+        // 言語切り替え(Settings)を即時反映するため、NSMenu の項目名を作り直す。
+        languageCancellable = L10n.shared.$language.dropFirst().sink { [weak self] _ in
+            Task { @MainActor in
+                self?.rebuildMenu()
+                if self?.state.isBusy == false { self?.state.setIdle() } // currentLine の言語を更新
+            }
+        }
+    }
+
+    /// 言語変更時に呼び直し、NSMenu の各項目名を現在の言語で作り直す。
+    private func rebuildMenu() {
         let menu = NSMenu()
-        menu.addItem(withTitle: "Status…", action: #selector(showStatusPopover), keyEquivalent: "")
-        menu.addItem(withTitle: "Settings…", action: #selector(showSettings), keyEquivalent: "")
+        menu.addItem(withTitle: L10n.t("menu.status"), action: #selector(showStatusPopover), keyEquivalent: "")
+        menu.addItem(withTitle: L10n.t("menu.settings"), action: #selector(showSettings), keyEquivalent: "")
         menu.addItem(NSMenuItem.separator())
-        menu.addItem(withTitle: "Quit", action: #selector(quit), keyEquivalent: "q")
+        menu.addItem(withTitle: L10n.t("menu.quit"), action: #selector(quit), keyEquivalent: "q")
         for menuItem in menu.items {
             menuItem.target = self
         }
-        item.menu = menu
-
-        statusItem = item
+        statusItem?.menu = menu
     }
 
     @objc private func showStatusPopover() {
@@ -159,7 +174,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         let hosting = NSHostingController(rootView: content)
         let window = NSWindow(contentViewController: hosting)
         window.styleMask = [.titled, .closable]
-        window.title = "Approve"
+        window.title = L10n.t("approvalWindow.title")
         window.level = .floating
         window.isReleasedWhenClosed = false
         window.delegate = self // 赤い閉じるボタン = キャンセル
@@ -207,7 +222,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         }
         hotKey.onPermissionMissing = { [weak self] in
             Task { @MainActor in
-                self?.state.setError("Accessibility permission is required to listen for the hotkey")
+                self?.state.setError(L10n.t("error.accessibilityRequired"))
                 self?.showStatusPopover()
             }
         }
@@ -250,7 +265,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
 
         guard let audioURL = recorder.stop() else {
             AppLog.write("ホットキー解放 → 録音なし(短すぎ or 開始失敗)")
-            state.setError("Chant too short or recording failed")
+            state.setError(L10n.t("error.chantTooShort"))
             state.setIdle()
             return
         }
@@ -271,7 +286,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
             case .failure(let error):
                 AppLog.write("STT 失敗: \(error)")
                 await MainActor.run {
-                    self.state.setError("Transcription failed: \(error)")
+                    self.state.setError(L10n.t("error.transcriptionFailed", "\(error)"))
                     self.state.setIdle()
                 }
             }
@@ -316,7 +331,8 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
                 chant: chant,
                 onEvent: { [weak self] text in
                     Task { @MainActor in
-                        self?.state.setEvent(text)
+                        guard let self, self.isCurrentSession(generation) else { return } // × 後の進捗は捨てる
+                        self.state.setEvent(text)
                     }
                 }
             )
@@ -338,7 +354,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
             guard await isCurrentSession(generation) else { return }
             AppLog.write("召喚失敗: \(error)")
             await MainActor.run {
-                state.setError("Summon failed: \(error)")
+                state.setError(L10n.t("error.summonFailed", "\(error)"))
                 state.setIdle()
             }
         }
@@ -362,7 +378,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
             state.setCompleted("\(result.appName)")
         } catch {
             AppLog.write("貼り付け失敗: \(error)")
-            state.setError("Paste failed: \(error)")
+            state.setError(L10n.t("error.pasteFailed", "\(error)"))
         }
     }
 
@@ -393,7 +409,8 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
                     reason: "却下。別案を",
                     onEvent: { [weak self] text in
                         Task { @MainActor in
-                            self?.state.setEvent(text)
+                            guard let self, self.isCurrentSession(generation) else { return } // × 後の進捗は捨てる
+                            self.state.setEvent(text)
                         }
                     }
                 )
@@ -412,7 +429,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
             } catch {
                 guard isCurrentSession(generation) else { return }
                 await MainActor.run {
-                    state.setError("Regeneration failed: \(error)")
+                    state.setError(L10n.t("error.regenerationFailed", "\(error)"))
                     state.setIdle()
                 }
             }

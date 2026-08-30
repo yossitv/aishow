@@ -18,6 +18,16 @@ enum Preferences {
         set { UserDefaults.standard.set(newValue, forKey: translateTargetLanguageKey) }
     }
 
+    /// メニューバー UI の表示言語。既定は English。
+    static let uiLanguageKey = "uiLanguage"
+
+    static var uiLanguage: UILanguage {
+        get {
+            UserDefaults.standard.string(forKey: uiLanguageKey).flatMap(UILanguage.init(rawValue:)) ?? .en
+        }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: uiLanguageKey) }
+    }
+
     /// 召喚本文に足すオプション。workflow ごとに必要なものだけ返す(呪文が読む key 名)。
     static func summonOptions(workflow: String) -> [String: String] {
         guard workflow == "translate" else { return [:] }

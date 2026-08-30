@@ -9,6 +9,8 @@ struct ApprovalView: View {
     var onApprove: (String) -> Void
     var onReject: () -> Void
 
+    @ObservedObject private var l10n = L10n.shared
+
     @State private var editedText: String
     /// 最前面が scan 時と食い違う状態で 1 回警告を出した後、「それでも貼る」の 2 回目クリックを待っている。
     @State private var confirmedDespiteMismatch = false
@@ -43,18 +45,18 @@ struct ApprovalView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Approve summon result").font(.headline)
+            Text(L10n.t("approval.title")).font(.headline)
 
             if !approval.proposal.sources.isEmpty {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Sources").font(.caption).foregroundColor(.secondary)
+                    Text(L10n.t("approval.sources")).font(.caption).foregroundColor(.secondary)
                     ForEach(approval.proposal.sources, id: \.self) { source in
                         Text(source).font(.caption).lineLimit(1).truncationMode(.middle)
                     }
                 }
             }
 
-            Text("Text (editable)").font(.caption).foregroundColor(.secondary)
+            Text(L10n.t("approval.textEditable")).font(.caption).foregroundColor(.secondary)
             TextEditor(text: $editedText)
                 .frame(height: 140)
                 .border(Color.secondary.opacity(0.3))
@@ -67,13 +69,13 @@ struct ApprovalView: View {
                 }
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("Paste into").font(.caption).foregroundColor(.secondary)
+                Text(L10n.t("approval.pasteInto")).font(.caption).foregroundColor(.secondary)
                 Text("\(approval.pack.app) — \(approval.pack.windowTitle ?? "(no title)")")
                     .font(.caption)
             }
 
             if frontmostChanged && !confirmedDespiteMismatch {
-                Text("⚠️ Front app changed since scan: \(approval.scannedApp). Please check the paste target.")
+                Text(L10n.t("approval.frontChanged", approval.scannedApp))
                     .font(.caption)
                     .foregroundColor(.red)
             }
@@ -83,19 +85,19 @@ struct ApprovalView: View {
             }
 
             HStack {
-                Button("Reject") { onReject() }
+                Button(L10n.t("approval.reject")) { onReject() }
                     .keyboardShortcut(.cancelAction) // Esc
                 Spacer()
                 if frontmostChanged && !confirmedDespiteMismatch {
                     // 1 回目のクリックでは貼り付けず、警告に同意させるだけ(2 回目のクリックで実行)。
-                    Button("Paste anyway") { confirmedDespiteMismatch = true }
+                    Button(L10n.t("approval.pasteAnyway")) { confirmedDespiteMismatch = true }
                         .keyboardShortcut(.defaultAction)
                 } else {
-                    Button("Approve") { onApprove(editedText) }
+                    Button(L10n.t("approval.approve")) { onApprove(editedText) }
                         .keyboardShortcut(.defaultAction) // ⏎(TextEditor にフォーカスが無いとき。あるときは onKeyPress が拾う)
                 }
             }
-            Text("⏎ Approve · ⇧⏎ New line · Esc Reject")
+            Text(L10n.t("approval.hint"))
                 .font(.caption2)
                 .foregroundColor(.secondary)
         }
