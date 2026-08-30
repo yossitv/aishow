@@ -9,7 +9,11 @@ final class PushToTalkRecorder {
     private var outFormat: AVAudioFormat?
     private var startedAt: Date?
     private var configObserver: NSObjectProtocol?
-    private var isReconfiguring = false
+    /// 構成変更のデバウンス(通知が連続するので 300ms 静かになってから 1 回だけ再構成する)。
+    private var reconfigureWork: DispatchWorkItem?
+    /// 1 回の録音で再構成する上限。Bluetooth 入力が 24kHz ⇄ 48kHz を往復し続けるケースで無限ループにしない。
+    private var reconfigureCount = 0
+    private static let maxReconfigurations = 3
 
     /// 1 秒未満の録音は詠唱として扱わない(ChantCommand と同じ閾値)。
     static let minimumSeconds: Double = 1.0
@@ -60,6 +64,7 @@ final class PushToTalkRecorder {
         self.pcmBox = box
         self.outFormat = outFormat
         self.startedAt = Date()
+        reconfigureCount = 0
 
         observeConfigurationChanges(of: engine)
     }
@@ -70,10 +75,15 @@ final class PushToTalkRecorder {
     /// `format.sampleRate == inputHWFormat.sampleRate` 例外で落ちることがあるため、
     /// メインキューへ一度ディスパッチしてから処理する(内部再構成が完了するのを待つ)。
     private func handleConfigurationChange(for changedEngine: AVAudioEngine) {
-        guard !isReconfiguring else { return }
-        isReconfiguring = true
         DispatchQueue.main.async { [weak self] in
-            self?.performReconfiguration(for: changedEngine)
+            guard let self, self.engine === changedEngine else { return }
+            self.reconfigureWork?.cancel()
+            let work = DispatchWorkItem { [weak self] in
+                self?.reconfigureWork = nil
+                self?.performReconfiguration(for: changedEngine)
+            }
+            self.reconfigureWork = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: work)
         }
     }
 
@@ -81,8 +91,12 @@ final class PushToTalkRecorder {
     /// まだ新しい HW フォーマットに追従しておらず `installTapOnBus` が NSException(sampleRate 不一致)で落ちる
     /// (実機クラッシュ 2026-08-29 20:11)。新しいエンジンなら inputNode の outputFormat は現在の HW と一致する。
     private func performReconfiguration(for changedEngine: AVAudioEngine) {
-        defer { isReconfiguring = false }
         guard let oldEngine = self.engine, oldEngine === changedEngine else { return }
+        guard reconfigureCount < PushToTalkRecorder.maxReconfigurations else {
+            AppLog.write("録音: 入力構成変更が繰り返されるため再構成を打ち切り(\(reconfigureCount) 回)")
+            return
+        }
+        reconfigureCount += 1
         guard let box = pcmBox, let outFormat = outFormat else { return }
 
         if let configObserver {
@@ -186,6 +200,8 @@ final class PushToTalkRecorder {
             NotificationCenter.default.removeObserver(configObserver)
         }
         configObserver = nil
+        reconfigureWork?.cancel()
+        reconfigureWork = nil
 
         engine.inputNode.removeTap(onBus: 0)
         engine.stop()

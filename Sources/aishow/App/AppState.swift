@@ -50,6 +50,7 @@ final class AppState: ObservableObject {
     }
 
     func setScanning() {
+        lastError = nil // 前回の「短すぎ」等を HUD に残さない
         currentLine = L10n.t("status.scanned")
         isBusy = true
     }

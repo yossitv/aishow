@@ -77,20 +77,78 @@ enum AudioInputDevices {
         return name as String
     }
 
-    /// `AVAudioEngine` の inputNode に、Preferences で選ばれたデバイスを割り当てる。
-    /// 未設定・デバイス未検出・設定失敗のいずれの場合もシステム既定へフォールバックし、
+    /// 内蔵マイクの CoreAudio UID(Apple Silicon / Intel の MacBook で共通)。
+    static let builtInMicrophoneUID = "BuiltInMicrophoneDevice"
+
+    /// 現在のシステム既定入力デバイスの ID。
+    static func defaultInputDeviceID() -> AudioDeviceID? {
+        var deviceID = AudioDeviceID(0)
+        var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultInputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        let status = AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &deviceID)
+        guard status == noErr, deviceID != 0 else { return nil }
+        return deviceID
+    }
+
+    /// デバイスの転送方式(kAudioDeviceTransportType*)。
+    static func transportType(of deviceID: AudioDeviceID) -> UInt32? {
+        var value: UInt32 = 0
+        var size = UInt32(MemoryLayout<UInt32>.size)
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyTransportType,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        guard AudioObjectGetPropertyData(deviceID, &address, 0, nil, &size, &value) == noErr else { return nil }
+        return value
+    }
+
+    /// Bluetooth(AirPods 等)の入力か。HFP ⇄ A2DP の切替でサンプルレートが変わり、A2DP 側ではマイクデータが
+    /// 来ないため、録音用途では内蔵マイクへ逃がす(2026-08-29 実機: 24kHz ⇄ 48kHz を往復して 0 bytes)。
+    static func isBluetooth(_ deviceID: AudioDeviceID) -> Bool {
+        guard let type = transportType(of: deviceID) else { return false }
+        return type == kAudioDeviceTransportTypeBluetooth || type == kAudioDeviceTransportTypeBluetoothLE
+    }
+
+    /// `AVAudioEngine` の inputNode に録音用の入力デバイスを割り当てる。
+    /// 優先順: Preferences で選ばれたデバイス → システム既定。ただし選ばれた/既定のデバイスが **Bluetooth** で
+    /// 内蔵マイクがあるときは内蔵マイクを使う。未検出・設定失敗の場合はシステム既定へフォールバックし、
     /// 録音自体は止めない(呼び出し側は特にエラーハンドリング不要)。
     static func applyPreferredInputDevice(to inputNode: AVAudioInputNode) {
-        guard let uid = Preferences.microphoneDeviceUID, !uid.isEmpty else { return }
-        guard let deviceID = deviceID(forUID: uid) else {
-            AppLog.write("マイク設定: 指定デバイスが見つからずシステム既定にフォールバック(uid=\(uid))")
-            return
+        let preferredUID = Preferences.microphoneDeviceUID.flatMap { $0.isEmpty ? nil : $0 }
+
+        var target: AudioDeviceID?
+        var label = "システム既定"
+        if let uid = preferredUID {
+            if let id = deviceID(forUID: uid) {
+                target = id
+                label = "指定デバイス(uid=\(uid))"
+            } else {
+                AppLog.write("マイク設定: 指定デバイスが見つからずシステム既定にフォールバック(uid=\(uid))")
+            }
         }
+        if target == nil {
+            target = defaultInputDeviceID()
+        }
+        guard var chosen = target else { return }
+
+        var explicitlySet = preferredUID != nil && target != defaultInputDeviceID()
+        if isBluetooth(chosen), let builtIn = deviceID(forUID: builtInMicrophoneUID), builtIn != chosen {
+            AppLog.write("マイク設定: \(label) は Bluetooth 入力のため内蔵マイクを使用(HFP 切替で録音が途切れるのを回避)")
+            chosen = builtIn
+            explicitlySet = true
+        }
+        guard explicitlySet || preferredUID != nil else { return } // 既定のままで良い
+
         guard let audioUnit = inputNode.audioUnit else {
             AppLog.write("マイク設定: audioUnit が取得できずシステム既定にフォールバック")
             return
         }
-        var mutableDeviceID = deviceID
+        var mutableDeviceID = chosen
         let status = AudioUnitSetProperty(
             audioUnit,
             kAudioOutputUnitProperty_CurrentDevice,
@@ -102,7 +160,7 @@ enum AudioInputDevices {
         if status != noErr {
             AppLog.write("マイク設定: AudioUnitSetProperty 失敗(status=\(status))、システム既定にフォールバック")
         } else {
-            AppLog.write("マイク設定: 入力デバイスを指定(uid=\(uid))")
+            AppLog.write("マイク設定: 入力デバイスを指定(id=\(chosen), \(label))")
         }
     }
 }
