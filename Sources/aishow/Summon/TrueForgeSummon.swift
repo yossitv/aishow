@@ -63,7 +63,8 @@ enum TrueForgeSummon {
         }
     }
 
-    static func buildTurnBody(workflow: String, pack: ContextPack, chant: String) -> String {
+    /// ターン本文。`options` は呪文が読む追加指定(例: translate の `target_language`)。key 順で安定させる。
+    static func buildTurnBody(workflow: String, pack: ContextPack, chant: String, options: [String: String] = [:]) -> String {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         let contextJSON: String
@@ -72,7 +73,12 @@ enum TrueForgeSummon {
         } else {
             contextJSON = "{}"
         }
-        return "workflow: \(workflow)\ncontext: \(contextJSON)\nchant: \(chant)"
+        var body = "workflow: \(workflow)\ncontext: \(contextJSON)"
+        for key in options.keys.sorted() {
+            body += "\n\(key): \(options[key] ?? "")"
+        }
+        body += "\nchant: \(chant)"
+        return body
     }
 
     /// ターンを送信し、SSE イベントを「いま: …」「済み: …」の文字列として `onEvent` に流す。
@@ -113,17 +119,17 @@ enum TrueForgeSummon {
                 collectedMessages.append(content)
             }
             for toolCall in toolCalls {
-                onEvent("いま: \(toolCall.name ?? toolCall.id ?? "tool")")
+                onEvent("now: \(toolCall.name ?? toolCall.id ?? "tool")")
             }
         case .toolResponse(let toolCallId):
-            onEvent("済み: \(toolCallId ?? "tool")")
+            onEvent("done: \(toolCallId ?? "tool")")
         case .toolApprovalRequired(_, let toolCalls):
             for toolCall in toolCalls {
-                onEvent("いま: (承認待ち) \(toolCall.id)")
+                onEvent("now: (awaiting approval) \(toolCall.id)")
             }
         case .turnDone(let status, let message):
             if status != "done" {
-                onEvent("済み: turn.done status=\(status) \(message ?? "")")
+                onEvent("done: turn.done status=\(status) \(message ?? "")")
             }
         default:
             break

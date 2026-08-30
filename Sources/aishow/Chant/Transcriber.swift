@@ -77,8 +77,16 @@ enum Transcriber {
             return .failure(SendError(message: "no HTTP response"))
         }
         guard (200...299).contains(http.statusCode) else {
-            let bodyText = resultData.flatMap { String(data: $0, encoding: .utf8) } ?? ""
-            return .failure(SendError(message: "HTTP \(http.statusCode) \(bodyText.prefix(200))"))
+            // OpenAI のエラー本文 {"error":{"message":...}} は message だけ出す(HUD の 1 行に収める)。
+            var detail = resultData.flatMap { String(data: $0, encoding: .utf8) } ?? ""
+            if let data = resultData,
+               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let err = json["error"] as? [String: Any],
+               let message = err["message"] as? String {
+                detail = message
+            }
+            AppLog.write(String(format: "STT 失敗: HTTP %d %@", http.statusCode, detail))
+            return .failure(SendError(message: "HTTP \(http.statusCode) \(detail.prefix(200))"))
         }
         guard let data = resultData,
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],

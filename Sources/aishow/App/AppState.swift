@@ -23,7 +23,7 @@ struct CompletedItem: Identifiable {
 @MainActor
 final class AppState: ObservableObject {
     /// 「いま」に出す 1 行(空なら待機中)
-    @Published var currentLine: String = "待機中(\(HotKey.displayName) で詠唱)"
+    @Published var currentLine: String = "Ready — hold \(HotKey.displayName) to chant"
     /// 「待ち」に出す 1 行(承認待ちの workflow 名など)
     @Published var pendingLine: String = ""
     /// 「済み」の直近 1 件
@@ -45,27 +45,27 @@ final class AppState: ObservableObject {
     }
 
     func setIdle() {
-        currentLine = "待機中(\(HotKey.displayName) で詠唱)"
+        currentLine = "Ready — hold \(HotKey.displayName) to chant"
         isBusy = false
     }
 
     func setScanning() {
-        currentLine = "索敵 ✔"
+        currentLine = "Scanned ✔"
         isBusy = true
     }
 
     func setRecording() {
-        currentLine = "詠唱中…"
+        currentLine = "Chanting…"
     }
 
     func setTranscribing() {
-        currentLine = "文字起こし中…"
+        currentLine = "Transcribing…"
     }
 
     func setSummoning(_ workflow: String, domain: String?) {
         let site = domain.map { "\(workflow) @ \($0)" } ?? workflow
-        currentLine = "召喚 / \(site)"
-        pendingLine = "調査中…"
+        currentLine = "Summoning / \(site)"
+        pendingLine = "Summoning…"
     }
 
     func setEvent(_ text: String) {
@@ -74,20 +74,39 @@ final class AppState: ObservableObject {
 
     func setAwaitingApproval(_ approval: PendingApproval) {
         pendingApproval = approval
-        currentLine = "承認待ち"
+        currentLine = "Awaiting approval"
         pendingLine = "\(approval.site.workflow.rawValue) @ \(approval.site.domain ?? "-")"
     }
 
+    /// 貼り付け完了。HUD に「Pasted into X ✔」を 2.5 秒見せてから待機に戻す(承認後に何も変わらないと分からないため)。
     func setCompleted(_ summary: String) {
         lastCompleted = CompletedItem(summary: summary)
         pendingApproval = nil
         pendingLine = ""
-        setIdle()
+        lastError = nil
+        currentLine = "Pasted into \(summary) ✔ — review and press Enter yourself"
+        isBusy = false
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
+            guard let self, !self.isBusy, self.pendingApproval == nil else { return }
+            self.setIdle()
+        }
+    }
+
+    /// × ボタン等でセッションを取り消した。エラーも消して待機に戻す。
+    func setCancelled() {
+        pendingApproval = nil
+        lastError = nil
+        currentLine = "Cancelled"
+        isBusy = false
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+            guard let self, !self.isBusy, self.pendingApproval == nil else { return }
+            self.setIdle()
+        }
     }
 
     func setError(_ message: String) {
         lastError = message
-        currentLine = "エラー"
+        currentLine = "Error"
         isBusy = false
     }
 }
