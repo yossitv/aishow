@@ -137,8 +137,12 @@ enum Paster {
         }
 
         match.activate(options: [])
-        // activate() は非同期的に反映されることがあるため、少し待って front check する。
-        Thread.sleep(forTimeInterval: 0.15)
+        // activate() は非同期的に反映される(macOS 14+ の協調アクティベーションでは遅れることもある)ため、
+        // 最前面になるまで最大 1 秒待つ。呼び出し側が最終確認する。
+        for _ in 0..<10 {
+            if NSWorkspace.shared.frontmostApplication?.processIdentifier == match.processIdentifier { break }
+            Thread.sleep(forTimeInterval: 0.1)
+        }
         return match
     }
 
@@ -151,6 +155,9 @@ enum Paster {
               let keyUp = CGEvent(keyboardEventSource: source, virtualKey: vKeyCode, keyDown: false) else {
             throw Failure.pasteEventFailed
         }
+        // 自分の合成キーだと HotKey が見分けられるように印を付ける
+        keyDown.setIntegerValueField(.eventSourceUserData, value: SyntheticKeyEvent.marker)
+        keyUp.setIntegerValueField(.eventSourceUserData, value: SyntheticKeyEvent.marker)
         keyDown.flags = .maskCommand
         keyUp.flags = .maskCommand
 
