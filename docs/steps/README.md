@@ -12,6 +12,7 @@
 | [04](step-04-chant.md) | 詠唱 | `aishow chant`: 録音 → OpenAI STT → テキスト | 00 |
 | [05](step-05-summon.md) | 召喚 | `aishow summon`: TrueForge API でセッション・ターン・イベント・承認 → cast | 01, 02, 03, 04 |
 | [06](step-06-menubar.md) | 常駐 | `Aishow.app`: メニューバー常駐、グローバルホットキー、状態表示、承認ポップオーバー | 05 |
+| [07](step-07-glass-ui.md) | 硝子 | Popover を Liquid Glass 風に(`glassEffect` + macOS 14 フォールバック)。見た目だけ、ロジック不変 | 06 |
 
 ゴール(Step 06 完了時)の体験:
 > 企業サイトの Contact フォームを開く → `Option+Space` を押しながら日本語で詠唱 → メニューバーに「索敵 ✔ → website_form @ acme.com → 召喚 → 調査中(Bright Data)…」→ 承認ポップオーバー → 承認 → Message 欄に英文が入る。送信は人間。

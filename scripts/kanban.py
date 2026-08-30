@@ -5,6 +5,7 @@
   python3 scripts/kanban.py show                       # ボードを表示
   python3 scripts/kanban.py move S02 doing "担当官に発注"  # 列を移動(backlog/doing/review/done)
   python3 scripts/kanban.py note S02 "検収 3/5"          # メモ追記
+  python3 scripts/kanban.py add S07 "タイトル" docs/steps/step-07-x.md ["メモ"]  # カード追加(backlog)
 
 シート "Cards" が正本、シート "Board" は Cards から毎回描き直す。
 """
@@ -89,6 +90,10 @@ if __name__ == "__main__":
         save(wb, rows); show(rows)
     elif a[0] == "note" and len(a) >= 3:
         wb, rows = load(); r = find(rows, a[1]); r[6] = a[2]; r[5] = now(); save(wb, rows); show(rows)
+    elif a[0] == "add" and len(a) >= 4:
+        wb, rows = load()
+        if any(r[0] == a[1] for r in rows): sys.exit(f"card {a[1]} already exists")
+        rows.append([a[1], a[2], a[3], "backlog", "", now(), a[4] if len(a) > 4 else ""]); save(wb, rows); show(rows)
     elif a[0] == "owner" and len(a) >= 3:
         wb, rows = load(); r = find(rows, a[1]); r[4] = a[2]; r[5] = now(); save(wb, rows); show(rows)
     else:
