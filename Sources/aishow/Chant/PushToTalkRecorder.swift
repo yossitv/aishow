@@ -61,13 +61,7 @@ final class PushToTalkRecorder {
         self.outFormat = outFormat
         self.startedAt = Date()
 
-        configObserver = NotificationCenter.default.addObserver(
-            forName: .AVAudioEngineConfigurationChange,
-            object: engine,
-            queue: nil
-        ) { [weak self] _ in
-            self?.handleConfigurationChange(for: engine)
-        }
+        observeConfigurationChanges(of: engine)
     }
 
     /// AVAudioEngineConfigurationChange 通知を処理する(Bluetooth マイクのサンプルレート切替など)。
@@ -83,24 +77,51 @@ final class PushToTalkRecorder {
         }
     }
 
+    /// 構成変更後は **エンジンを作り直す**。古いエンジンにタップを再設置すると、ノードのフォーマットが
+    /// まだ新しい HW フォーマットに追従しておらず `installTapOnBus` が NSException(sampleRate 不一致)で落ちる
+    /// (実機クラッシュ 2026-08-29 20:11)。新しいエンジンなら inputNode の outputFormat は現在の HW と一致する。
     private func performReconfiguration(for changedEngine: AVAudioEngine) {
         defer { isReconfiguring = false }
-        guard let engine = self.engine, engine === changedEngine else { return }
+        guard let oldEngine = self.engine, oldEngine === changedEngine else { return }
         guard let box = pcmBox, let outFormat = outFormat else { return }
 
-        engine.inputNode.removeTap(onBus: 0)
+        if let configObserver {
+            NotificationCenter.default.removeObserver(configObserver)
+        }
+        configObserver = nil
+        oldEngine.inputNode.removeTap(onBus: 0)
+        oldEngine.stop()
+        self.engine = nil // 再開に失敗した場合は stop() が nil を返し「録音なし」になる(クラッシュはしない)
 
-        guard installTap(on: engine, box: box, outFormat: outFormat) else {
+        let newEngine = AVAudioEngine()
+        AudioInputDevices.applyPreferredInputDevice(to: newEngine.inputNode)
+        let newFormat = newEngine.inputNode.outputFormat(forBus: 0)
+        guard newFormat.sampleRate > 0, newFormat.channelCount > 0 else {
+            AppLog.write("録音: 入力構成変更後に有効な入力フォーマットが無い(デバイス無し?)")
+            return
+        }
+        guard installTap(on: newEngine, box: box, outFormat: outFormat) else {
             AppLog.write("録音: 入力構成変更後の再インストールに失敗")
             return
         }
-
         do {
-            try engine.start()
-            let newFormat = engine.inputNode.outputFormat(forBus: 0)
-            AppLog.write(String(format: "録音: 入力構成変更 → 再開(input=%.0fHz/%dch)", newFormat.sampleRate, newFormat.channelCount))
+            try newEngine.start()
         } catch {
             AppLog.write(String(format: "録音: 入力構成変更後の engine.start 失敗 %@", error.localizedDescription))
+            return
+        }
+        self.engine = newEngine
+        observeConfigurationChanges(of: newEngine)
+        AppLog.write(String(format: "録音: 入力構成変更 → エンジン再作成で再開(input=%.0fHz/%dch)", newFormat.sampleRate, newFormat.channelCount))
+    }
+
+    private func observeConfigurationChanges(of engine: AVAudioEngine) {
+        configObserver = NotificationCenter.default.addObserver(
+            forName: .AVAudioEngineConfigurationChange,
+            object: engine,
+            queue: nil
+        ) { [weak self] _ in
+            self?.handleConfigurationChange(for: engine)
         }
     }
 
@@ -110,7 +131,9 @@ final class PushToTalkRecorder {
         let input = engine.inputNode
         let inputFormat = input.outputFormat(forBus: 0)
 
-        guard AVAudioConverter(from: inputFormat, to: outFormat) != nil else {
+        // sampleRate 0 / 0ch(入力デバイス無し)で installTap すると NSException で落ちるため先に弾く。
+        guard inputFormat.sampleRate > 0, inputFormat.channelCount > 0,
+              AVAudioConverter(from: inputFormat, to: outFormat) != nil else {
             return false
         }
 
