@@ -59,7 +59,7 @@ enum SummonCommand {
         }
 
         // 5. ターン送信 → ストリーム表示
-        let turnBody = TrueForgeSummon.buildTurnBody(workflow: scanned.site.workflow.rawValue, pack: scanned.pack, chant: text)
+        let turnBody = TrueForgeSummon.buildTurnBody(workflow: scanned.site.workflow.rawValue, pack: scanned.pack, chant: text, options: Preferences.summonOptions(workflow: scanned.site.workflow.rawValue))
 
         func sendAndCollect(message: String) -> Swift.Result<Proposal, TrueForgeSummon.SummonError> {
             TrueForgeSummon.sendAndCollect(sessionId: sessionId, message: message, onEvent: { writeErr($0) })

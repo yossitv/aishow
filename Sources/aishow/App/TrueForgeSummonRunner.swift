@@ -13,7 +13,12 @@ struct TrueForgeSummonRunner: SummonRunner {
         onEvent: @escaping (String) -> Void
     ) async throws -> Proposal {
         let sessionId = try ensureSessionOrThrow(site: site, pack: pack)
-        let message = TrueForgeSummon.buildTurnBody(workflow: site.workflow.rawValue, pack: pack, chant: chant)
+        let message = TrueForgeSummon.buildTurnBody(
+            workflow: site.workflow.rawValue,
+            pack: pack,
+            chant: chant,
+            options: Preferences.summonOptions(workflow: site.workflow.rawValue) // translate の宛先言語など
+        )
         return try await send(sessionId: sessionId, message: message, onEvent: onEvent)
     }
 
