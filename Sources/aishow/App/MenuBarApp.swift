@@ -123,6 +123,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     // MARK: - Permissions
 
     private func checkPermissionsOnFirstLaunch() {
+        Permissions.promptAccessibilityIfNeeded()
         state.refreshPermissions()
         Permissions.requestMicrophoneIfNeeded { [weak self] _ in
             Task { @MainActor in

@@ -21,6 +21,14 @@ enum Permissions {
         )
     }
 
+    /// Accessibility が未許可なら macOS 標準の許可ダイアログ(「システム設定を開く」ボタン付き)を出す。
+    /// VoiceInk などと同じ方式で、ユーザーが自分で一覧に追加する手間をなくす。ダイアログは 1 プロセスにつき 1 回だけ出る。
+    @discardableResult
+    static func promptAccessibilityIfNeeded() -> Bool {
+        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+        return AXIsProcessTrustedWithOptions(options)
+    }
+
     /// マイクの許可ダイアログを出す(未決定の場合のみ)。
     static func requestMicrophoneIfNeeded(completion: @escaping (Bool) -> Void) {
         switch AVCaptureDevice.authorizationStatus(for: .audio) {
