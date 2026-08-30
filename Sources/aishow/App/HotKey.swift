@@ -14,9 +14,44 @@ import Foundation
 /// が無いとイベントを受け取れない。権限が無い場合は `onPermissionMissing` を呼ぶ。
 final class HotKey {
     private static let spaceKeyCode: UInt16 = 49
+    /// kVK_Function。Fn(🌐)単独モードで `flagsChanged` イベントの keyCode として使う。
+    private static let functionKeyCode: UInt16 = 63
+    /// kVK_Command / kVK_RightCommand。
+    private static let leftCommandKeyCode: UInt16 = 55
+    private static let rightCommandKeyCode: UInt16 = 54
     static let modifiersDefaultsKey = "hotKeyModifiers"
 
-    /// `UserDefaults` から修飾キーを読む。未設定・不正なら `.option`。
+    /// 修飾キー単独の長押しモード(Space を併用しない)。`flagsChanged` で押下/解放を見る。
+    struct HoldKey {
+        let keyCodes: Set<UInt16>
+        let flag: NSEvent.ModifierFlags
+        let name: String
+    }
+
+    /// `UserDefaults` の `hotKeyModifiers` が単独長押しモードを指していればその定義を返す。
+    /// - `fn` / `function` / `globe`: Fn(🌐)キー
+    /// - `cmd` / `command`: 左右どちらの Command キーでも
+    /// - `rcmd` / `lcmd`: 右 / 左の Command キーのみ
+    static var holdKey: HoldKey? {
+        let raw = (UserDefaults.standard.string(forKey: modifiersDefaultsKey) ?? "").lowercased()
+        switch raw {
+        case "fn", "function", "globe":
+            return HoldKey(keyCodes: [functionKeyCode], flag: .function, name: "Hold Fn (🌐)")
+        case "cmd", "command":
+            return HoldKey(keyCodes: [leftCommandKeyCode, rightCommandKeyCode], flag: .command, name: "Hold ⌘")
+        case "rcmd", "rcommand":
+            return HoldKey(keyCodes: [rightCommandKeyCode], flag: .command, name: "Hold Right ⌘")
+        case "lcmd", "lcommand":
+            return HoldKey(keyCodes: [leftCommandKeyCode], flag: .command, name: "Hold Left ⌘")
+        default:
+            return nil
+        }
+    }
+
+    /// Fn(🌐)単独モードか(StatusView の注意書き表示用)。
+    static var isFnMode: Bool { holdKey?.flag == .function }
+
+    /// `UserDefaults` から修飾キーを読む。未設定・不正なら `.option`。Fn モード時は使わない。
     static func configuredModifiers() -> NSEvent.ModifierFlags {
         let raw = UserDefaults.standard.string(forKey: modifiersDefaultsKey) ?? "option"
         var flags: NSEvent.ModifierFlags = []
@@ -32,8 +67,9 @@ final class HotKey {
         return flags.isEmpty ? [.option] : flags
     }
 
-    /// 表示用ラベル(例: `Control+Option+Space`)。
+    /// 表示用ラベル(例: `Control+Option+Space` / `Fn(🌐)`)。
     static var displayName: String {
+        if let hold = holdKey { return hold.name }
         let f = configuredModifiers()
         var parts: [String] = []
         if f.contains(.control) { parts.append("Control") }
@@ -45,6 +81,7 @@ final class HotKey {
     }
 
     private let requiredModifiers = HotKey.configuredModifiers()
+    private let holdKey = HotKey.holdKey
 
     private var monitor: Any?
     private var isDown = false
@@ -52,6 +89,9 @@ final class HotKey {
     var onPress: (() -> Void)?
     var onRelease: (() -> Void)?
     var onPermissionMissing: (() -> Void)?
+    /// 単独長押しモードで、押している間に別のキーが押された(= 通常のショートカット操作だった)ときに呼ぶ。
+    /// 呼び出し側は録音を破棄して待機に戻す。
+    var onCancel: (() -> Void)?
 
     /// 監視を開始する。Accessibility 権限が無ければ案内コールバックを呼んで何もしない。
     func start() {
@@ -61,8 +101,23 @@ final class HotKey {
         }
         guard monitor == nil else { return }
 
-        monitor = NSEvent.addGlobalMonitorForEvents(matching: [.keyDown, .keyUp]) { [weak self] event in
-            self?.handle(event)
+        if holdKey != nil {
+            // 単独長押しモード(Fn / ⌘)。Fn の場合はシステム設定で「🌐キーを押して: 何もしない」にする必要がある
+            // (既定の入力ソース切替等が割り当てられていると flagsChanged が奪われる)。
+            // keyDown も見て、長押し中に別キーが押されたら(⌘C 等の通常操作)録音を中止する。
+            monitor = NSEvent.addGlobalMonitorForEvents(matching: [.flagsChanged, .keyDown]) { [weak self] event in
+                // scan(⌘C)/ cast(⌘V)で自分が送った合成キーは無視する。
+                if SyntheticKeyEvent.isOwn(event) { return }
+                if event.type == .keyDown {
+                    self?.handleKeyDownWhileHolding()
+                } else {
+                    self?.handleFlagsChanged(event)
+                }
+            }
+        } else {
+            monitor = NSEvent.addGlobalMonitorForEvents(matching: [.keyDown, .keyUp]) { [weak self] event in
+                self?.handle(event)
+            }
         }
     }
 
@@ -71,6 +126,8 @@ final class HotKey {
             NSEvent.removeMonitor(monitor)
         }
         monitor = nil
+        pendingHold?.cancel()
+        pendingHold = nil
         isDown = false
     }
 
@@ -98,5 +155,50 @@ final class HotKey {
         default:
             break
         }
+    }
+
+    /// 単独長押しモードの長押し判定時間。これより短い押下(⌘C 等の通常操作)は無視する。
+    static let holdDelay: TimeInterval = 0.35
+
+    /// 長押し判定待ちのタイマー。
+    private var pendingHold: DispatchWorkItem?
+
+    /// 単独長押しモード。対象キーを `holdDelay` 以上単独で押し続けたら `onPress`、離したら `onRelease`。
+    /// 判定前に離した/別キーを押した場合は何もしない(通常のショートカット操作として素通し)。
+    private func handleFlagsChanged(_ event: NSEvent) {
+        guard let hold = holdKey, hold.keyCodes.contains(event.keyCode) else { return }
+        let isHeld = event.modifierFlags.contains(hold.flag)
+        if isHeld {
+            guard !isDown, pendingHold == nil else { return }
+            let work = DispatchWorkItem { [weak self] in
+                guard let self, self.pendingHold != nil else { return }
+                self.pendingHold = nil
+                self.isDown = true
+                self.onPress?()
+            }
+            pendingHold = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + HotKey.holdDelay, execute: work)
+        } else {
+            if let pending = pendingHold {
+                pending.cancel()
+                pendingHold = nil // 判定前に離した → 通常操作
+            }
+            if isDown {
+                isDown = false
+                onRelease?()
+            }
+        }
+    }
+
+    /// 単独長押し中(または判定待ち中)に別キーが押された = 通常のショートカット操作。
+    private func handleKeyDownWhileHolding() {
+        if let pending = pendingHold {
+            pending.cancel()
+            pendingHold = nil
+            return
+        }
+        guard isDown else { return }
+        isDown = false
+        onCancel?()
     }
 }
