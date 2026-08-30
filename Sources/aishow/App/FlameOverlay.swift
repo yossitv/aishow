@@ -94,6 +94,10 @@ final class FlameOverlay {
         for panel in oldPanels {
             panel.orderOut(nil)
         }
+
+        // 呼び出し側(ホットキー押下)はこの直後に同期 scan で main スレッドを 1 秒前後ブロックする。
+        // 明示的に commit しないと scan が終わるまで炎が描かれない。
+        CATransaction.flush()
     }
 }
 

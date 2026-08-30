@@ -293,6 +293,13 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         // 後に回すと押した直後の声が落ちる)。
         recorder.start()
 
+        // 焔(Step 08): 音声入力している間だけ画面の縁に炎を出す(録音が実際に始まった場合のみ)。
+        // scan は main スレッドを 0.5〜1.5 秒ブロックするので、その前に出す(後に回すと押している間ほぼ見えない)。
+        // パネルは非アクティブ化・クリック透過なので、最前面アプリの取得・⌘C には影響しない。
+        if recorder.isRecording {
+            flame.show()
+        }
+
         // 鉄則4: 最前面アプリの取得は自分の UI を出す前に行う。
         let scanStarted = Date()
         let scan = Pipeline.scanNow()
@@ -301,11 +308,6 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
 
         state.setScanning()
         state.setRecording()
-        // 焔(Step 08): 音声入力している間だけ画面の縁に炎を出す。
-        // マイク権限が無く録音が始まらなかった場合は出さない(録音していないのに炎だけ出るのを防ぐ)。
-        if recorder.isRecording {
-            flame.show()
-        }
     }
 
     /// 長押し中に別キーが押された(⌘C 等の通常操作)。録音を破棄して待機に戻す。
