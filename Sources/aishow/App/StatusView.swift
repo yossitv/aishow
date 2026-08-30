@@ -10,10 +10,10 @@ struct StatusView: View {
 
             Divider()
 
-            row(label: "いま", value: state.currentLine)
-            row(label: "待ち", value: state.pendingLine.isEmpty ? "-" : state.pendingLine)
+            row(label: "Now", value: state.currentLine)
+            row(label: "Pending", value: state.pendingLine.isEmpty ? "-" : state.pendingLine)
             row(
-                label: "済み",
+                label: "Done",
                 value: state.lastCompleted?.summary ?? "-"
             )
 
@@ -27,6 +27,13 @@ struct StatusView: View {
             if !state.permissions.accessibility || !state.permissions.microphone || !state.permissions.automation {
                 Divider()
                 permissionWarnings
+            }
+
+            if HotKey.isFnMode {
+                // Fn(🌐)単独モードの注意書き: システム設定側で🌐キーの既定動作を無効化しないと奪われる。
+                Text("Fn (🌐) mode: Set System Settings → Keyboard → “Press 🌐 key to” = Do Nothing")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
             }
         }
         .padding(12)
@@ -47,15 +54,15 @@ struct StatusView: View {
 
     private var permissionWarnings: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("権限が不足しています").font(.caption).foregroundColor(.orange)
+            Text("Permissions needed").font(.caption).foregroundColor(.orange)
             if !state.permissions.accessibility {
-                permissionButton(title: "Accessibility を許可…", pane: .accessibility)
+                permissionButton(title: "Allow Accessibility…", pane: .accessibility)
             }
             if !state.permissions.microphone {
-                permissionButton(title: "マイクを許可…", pane: .microphone)
+                permissionButton(title: "Allow Microphone…", pane: .microphone)
             }
             if !state.permissions.automation {
-                permissionButton(title: "Automation を許可…", pane: .automation)
+                permissionButton(title: "Allow Automation…", pane: .automation)
             }
         }
     }

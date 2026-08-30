@@ -32,11 +32,11 @@ struct StubSummonRunner: SummonRunner {
         chant: String,
         onEvent: @escaping (String) -> Void
     ) async throws -> Proposal {
-        onEvent("調査中…")
+        onEvent("Summoning…")
         try await Task.sleep(nanoseconds: 1_000_000_000)
         return Proposal(
             sources: [],
-            text: "(stub) \(chant) を英訳した風のダミーです",
+            text: "(stub) A dummy English translation of \(chant)",
             note: "stub"
         )
     }
