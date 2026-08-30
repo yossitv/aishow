@@ -114,6 +114,36 @@ enum AudioInputDevices {
         return type == kAudioDeviceTransportTypeBluetooth || type == kAudioDeviceTransportTypeBluetoothLE
     }
 
+    /// push-to-talk 録音(`AVCaptureSession`)で使う入力デバイスを決める。
+    /// 優先順: Preferences で選ばれたデバイス → システム既定。ただし選ばれた/既定のデバイスが **Bluetooth**
+    /// (AirPods 等)で内蔵マイクがあるときは内蔵マイクを使う(HFP ⇄ A2DP 切替で録音が途切れる・音楽の音質が落ちる)。
+    static func captureDeviceForRecording() -> AVCaptureDevice? {
+        let preferredUID = Preferences.microphoneDeviceUID.flatMap { $0.isEmpty ? nil : $0 }
+
+        var chosen: AVCaptureDevice?
+        var label = "システム既定"
+        if let uid = preferredUID {
+            if let device = AVCaptureDevice(uniqueID: uid) {
+                chosen = device
+                label = "指定デバイス(\(device.localizedName))"
+            } else {
+                AppLog.write("マイク設定: 指定デバイスが見つからずシステム既定にフォールバック(uid=\(uid))")
+            }
+        }
+        if chosen == nil {
+            chosen = AVCaptureDevice.default(for: .audio)
+        }
+        guard let candidate = chosen else { return nil }
+
+        // AVCaptureDevice.uniqueID は CoreAudio の UID と同じ(実機確認: BuiltInMicrophoneDevice / xx-xx-…:input)。
+        if let id = deviceID(forUID: candidate.uniqueID), isBluetooth(id),
+           let builtIn = AVCaptureDevice(uniqueID: builtInMicrophoneUID), builtIn.uniqueID != candidate.uniqueID {
+            AppLog.write("マイク設定: \(label) は Bluetooth 入力のため内蔵マイクを使用(HFP 切替で録音が途切れるのを回避)")
+            return builtIn
+        }
+        return candidate
+    }
+
     /// `AVAudioEngine` の inputNode に録音用の入力デバイスを割り当てる。
     /// 優先順: Preferences で選ばれたデバイス → システム既定。ただし選ばれた/既定のデバイスが **Bluetooth** で
     /// 内蔵マイクがあるときは内蔵マイクを使う。未検出・設定失敗の場合はシステム既定へフォールバックし、
