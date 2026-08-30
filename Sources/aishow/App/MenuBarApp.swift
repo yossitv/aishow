@@ -73,7 +73,11 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
     private func presentPopover(content: AnyView) {
         let popover = NSPopover()
         popover.behavior = .transient
-        popover.contentViewController = NSHostingController(rootView: content)
+        let hosting = NSHostingController(rootView: content)
+        // Popover 自体の不透明な素材を消し、SwiftUI 側の Liquid Glass 表現をそのまま見せる。
+        hosting.view.wantsLayer = true
+        hosting.view.layer?.backgroundColor = NSColor.clear.cgColor
+        popover.contentViewController = hosting
         self.popover = popover
 
         guard let button = statusItem?.button else { return }

@@ -8,25 +8,26 @@ struct StatusView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Aishow").font(.headline)
 
-            Divider()
-
             row(label: "いま", value: state.currentLine)
+                .glassCard(tint: .blue)
             row(label: "待ち", value: state.pendingLine.isEmpty ? "-" : state.pendingLine)
+                .glassCard(tint: .orange)
             row(
                 label: "済み",
                 value: state.lastCompleted?.summary ?? "-"
             )
+            .glassCard(tint: .green)
 
             if let error = state.lastError {
-                Divider()
                 Text(error)
                     .font(.caption)
                     .foregroundColor(.red)
+                    .glassCard(tint: .red)
             }
 
             if !state.permissions.accessibility || !state.permissions.microphone || !state.permissions.automation {
-                Divider()
                 permissionWarnings
+                    .glassCard(tint: .orange)
             }
         }
         .padding(12)

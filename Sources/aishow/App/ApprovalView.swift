@@ -37,23 +37,35 @@ struct ApprovalView: View {
                         Text(source).font(.caption).lineLimit(1).truncationMode(.middle)
                     }
                 }
+                .glassCard()
             }
 
-            Text("本文(編集可)").font(.caption).foregroundColor(.secondary)
-            TextEditor(text: $editedText)
-                .frame(height: 140)
-                .border(Color.secondary.opacity(0.3))
+            VStack(alignment: .leading, spacing: 4) {
+                Text("本文(編集可)").font(.caption).foregroundColor(.secondary)
+                // TextEditor はガラスに乗せず、可読性のため不透明背景を維持する。
+                TextEditor(text: $editedText)
+                    .frame(height: 140)
+                    .background(Color(nsColor: .textBackgroundColor))
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .strokeBorder(Color.secondary.opacity(0.3))
+                    )
+            }
+            .glassCard()
 
             VStack(alignment: .leading, spacing: 2) {
                 Text("貼り付け先").font(.caption).foregroundColor(.secondary)
                 Text("\(approval.pack.app) — \(approval.pack.windowTitle ?? "(no title)")")
                     .font(.caption)
             }
+            .glassCard()
 
             if frontmostChanged && !confirmedDespiteMismatch {
                 Text("⚠️ 最前面アプリ/ウィンドウが索敵時(\(approval.scannedApp))と異なります。貼り付け先を確認してください。")
                     .font(.caption)
                     .foregroundColor(.red)
+                    .glassCard(tint: .red)
             }
 
             if let note = approval.proposal.note {
@@ -62,14 +74,17 @@ struct ApprovalView: View {
 
             HStack {
                 Button("却下") { onReject() }
+                    .glassButton()
                 Spacer()
                 if frontmostChanged && !confirmedDespiteMismatch {
                     // 1 回目のクリックでは貼り付けず、警告に同意させるだけ(2 回目のクリックで実行)。
                     Button("それでも貼る") { confirmedDespiteMismatch = true }
                         .keyboardShortcut(.defaultAction)
+                        .glassButton(prominent: true)
                 } else {
                     Button("承認") { onApprove(editedText) }
                         .keyboardShortcut(.defaultAction)
+                        .glassButton(prominent: true)
                 }
             }
         }
