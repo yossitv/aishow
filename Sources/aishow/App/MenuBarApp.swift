@@ -185,11 +185,17 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
     /// ボタンが見えない環境向けの承認ウィンドウ。popover と異なり key window になってよい。
     private func presentApprovalWindow(content: AnyView) {
         let hosting = NSHostingController(rootView: content)
+        // ウィンドウ自体の不透明な素材を消し、SwiftUI 側の Liquid Glass 表現をそのまま見せる。
+        hosting.view.wantsLayer = true
+        hosting.view.layer?.backgroundColor = NSColor.clear.cgColor
         let window = NSWindow(contentViewController: hosting)
         window.styleMask = [.titled, .closable]
         window.title = "Approve"
         window.level = .floating
         window.isReleasedWhenClosed = false
+        window.isOpaque = false
+        window.backgroundColor = .clear
+        window.titlebarAppearsTransparent = true
         window.delegate = self // 赤い閉じるボタン = キャンセル
         approvalWindow = window
 

@@ -38,6 +38,7 @@ struct SettingsView: View {
                         .font(.caption).foregroundColor(.secondary)
                 }
             }
+            .glassCard()
 
             VStack(alignment: .leading, spacing: 4) {
                 Picker("Translate into", selection: $targetLanguage) {
@@ -51,6 +52,7 @@ struct SettingsView: View {
                 Text("Used by the translate workflow (anywhere that isn’t a form, LinkedIn, chat, or mail)")
                     .font(.caption).foregroundColor(.secondary)
             }
+            .glassCard()
         }
         .padding(16)
         .frame(width: 340)

@@ -150,6 +150,13 @@ private struct HUDCompactView: View {
         state.isBusy || state.pendingApproval != nil || state.lastError != nil
     }
 
+    /// 録音中は赤、エラー中は橙、それ以外は tint 無しの Liquid Glass。
+    private var tint: Color? {
+        if state.lastError != nil { return .orange }
+        if state.isBusy { return .red }
+        return nil
+    }
+
     var body: some View {
         HStack(spacing: 10) {
             VStack(alignment: .center, spacing: 2) {
@@ -174,9 +181,9 @@ private struct HUDCompactView: View {
                 .help("Cancel")
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 4)
         .frame(maxWidth: 480)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        // Liquid Glass 風: 通常の `.background(.ultraThinMaterial)` の代わりに Glass.swift の共通カードを使う。
+        .glassCard(tint: tint, cornerRadius: 18)
     }
 }
