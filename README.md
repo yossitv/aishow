@@ -31,11 +31,14 @@ swift build && swift test
 echo "hello" | .build/debug/aishow cast --app com.apple.TextEdit      # 発動: 貼り付け(承認後にのみ使う)
 .build/debug/aishow summon --chant "この会社に音声 SDK の話でコールドメッセージ"   # 召喚 → 承認(y/e/n)→ 発動
 .build/debug/aishow summon --dry-run --chant "..."   # 提案の表示まで(貼り付けなし)
+.build/debug/aishow flame --seconds 4                 # (検収用) 画面の縁に炎を N 秒表示して消える
 
 # メニューバー常駐(ホットキー Option+Space を押しながら話す)
 make app && open dist/Aishow.app
 ```
 初回起動でマイク / Accessibility / Automation の許可が要る(メニューバーの「状態…」に導線)。`aishow` エージェントは初回 `summon` 時に `harness/spells/*.md` から自動作成・更新される。
+
+詠唱中(ホットキーを押している間)は画面の縁に炎が出る。メニューの「詠唱中に炎の枠を表示」のチェックを外す、または `defaults write com.openhome.aishow flameOverlayEnabled -bool false` で OFF にできる(既定 ON)。
 
 ## 動作の流れ
 1. **索敵**: ホットキー押下の瞬間に最前面アプリ・ウィンドウタイトル・ブラウザ URL・選択テキストを取得(自分の UI を出す前に)

@@ -16,12 +16,14 @@ enum MenuBarApp {
 }
 
 @MainActor
-private final class AppDelegate: NSObject, NSApplicationDelegate {
+private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var statusItem: NSStatusItem?
     private var popover: NSPopover?
     private let state = AppState()
     private let hotKey = HotKey()
     private let recorder = PushToTalkRecorder()
+    private let flame = FlameOverlay()
+    private var flameMenuItem: NSMenuItem?
 
     /// ホットキー押下の瞬間に取った索敵結果(離すまで保持する)。
     private var pendingScan: ScanResult?
@@ -35,6 +37,10 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         checkPermissionsOnFirstLaunch()
     }
 
+    func applicationWillTerminate(_ notification: Notification) {
+        flame.hide()
+    }
+
     // MARK: - Status item / popover
 
     private func setupStatusItem() {
@@ -44,8 +50,16 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         let menu = NSMenu()
+        menu.delegate = self
         menu.addItem(withTitle: "状態…", action: #selector(showStatusPopover), keyEquivalent: "")
         menu.addItem(withTitle: "設定…", action: #selector(showSettings), keyEquivalent: "")
+        let flameItem = NSMenuItem(
+            title: "詠唱中に炎の枠を表示",
+            action: #selector(toggleFlameOverlay),
+            keyEquivalent: ""
+        )
+        menu.addItem(flameItem)
+        flameMenuItem = flameItem
         menu.addItem(NSMenuItem.separator())
         menu.addItem(withTitle: "終了", action: #selector(quit), keyEquivalent: "q")
         for menuItem in menu.items {
@@ -68,6 +82,15 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func quit() {
         NSApplication.shared.terminate(nil)
+    }
+
+    @objc private func toggleFlameOverlay() {
+        FlameOverlay.isEnabled.toggle()
+        flameMenuItem?.state = FlameOverlay.isEnabled ? .on : .off
+    }
+
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        flameMenuItem?.state = FlameOverlay.isEnabled ? .on : .off
     }
 
     private func presentPopover(content: AnyView) {
@@ -143,9 +166,16 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         state.setScanning()
         state.setRecording()
         recorder.start()
+        // 焔(Step 08): 音声入力している間だけ画面の縁に炎を出す。
+        // マイク権限が無く録音が始まらなかった場合は出さない(録音していないのに炎だけ出るのを防ぐ)。
+        if recorder.isRecording {
+            flame.show()
+        }
     }
 
     private func handleHotKeyRelease() {
+        flame.hide()
+
         guard let scan = pendingScan else { return }
         pendingScan = nil
 
