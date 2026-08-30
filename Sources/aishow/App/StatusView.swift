@@ -3,30 +3,39 @@ import SwiftUI
 /// メニューバー Popover の常時表示。「いま / 待ち / 済み」の 3 行 + 直近 workflow。
 struct StatusView: View {
     @ObservedObject var state: AppState
+    @ObservedObject private var l10n = L10n.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Aishow").font(.headline)
 
-            Divider()
-
-            row(label: "いま", value: state.currentLine)
-            row(label: "待ち", value: state.pendingLine.isEmpty ? "-" : state.pendingLine)
+            row(label: L10n.t("status.now"), value: state.currentLine)
+                .glassCard(tint: .blue)
+            row(label: L10n.t("status.pending"), value: state.pendingLine.isEmpty ? L10n.t("status.dash") : state.pendingLine)
+                .glassCard(tint: .orange)
             row(
-                label: "済み",
-                value: state.lastCompleted?.summary ?? "-"
+                label: L10n.t("status.done"),
+                value: state.lastCompleted?.summary ?? L10n.t("status.dash")
             )
+            .glassCard(tint: .green)
 
             if let error = state.lastError {
-                Divider()
                 Text(error)
                     .font(.caption)
                     .foregroundColor(.red)
+                    .glassCard(tint: .red)
             }
 
             if !state.permissions.accessibility || !state.permissions.microphone || !state.permissions.automation {
-                Divider()
                 permissionWarnings
+                    .glassCard(tint: .orange)
+            }
+
+            if HotKey.isFnMode {
+                // Fn(🌐)単独モードの注意書き: システム設定側で🌐キーの既定動作を無効化しないと奪われる。
+                Text(L10n.t("status.fnModeNote"))
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
             }
         }
         .padding(12)
@@ -47,15 +56,15 @@ struct StatusView: View {
 
     private var permissionWarnings: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("権限が不足しています").font(.caption).foregroundColor(.orange)
+            Text(L10n.t("status.permissionsNeeded")).font(.caption).foregroundColor(.orange)
             if !state.permissions.accessibility {
-                permissionButton(title: "Accessibility を許可…", pane: .accessibility)
+                permissionButton(title: L10n.t("status.allowAccessibility"), pane: .accessibility)
             }
             if !state.permissions.microphone {
-                permissionButton(title: "マイクを許可…", pane: .microphone)
+                permissionButton(title: L10n.t("status.allowMicrophone"), pane: .microphone)
             }
             if !state.permissions.automation {
-                permissionButton(title: "Automation を許可…", pane: .automation)
+                permissionButton(title: L10n.t("status.allowAutomation"), pane: .automation)
             }
         }
     }

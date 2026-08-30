@@ -2,7 +2,7 @@
 
 > 声で詠唱すると、AI エージェントが現れて仕事をする。
 
-企業サイトの問い合わせフォームを開いたまま `Option+Space` を押して日本語で「この会社に、うちの音声 SDK の話でコールドメッセージ」と言う。
+企業サイトの問い合わせフォームを開いたまま `⌘` キーを長押しして日本語で「この会社に、うちの音声 SDK の話でコールドメッセージ」と言う。
 ローカルの **TrueForge** エージェントが召喚され、いま開いているサイトを特定し、**Bright Data MCP** でそのサイトを調査、**OpenAI** モデルがあなたの文体で英文を書く。**承認**した内容だけがフォームのカーソル位置に入る。送信は人間。
 
 Agent Harness Hackathon(San Francisco, 2026-08-29)提出作品。
@@ -31,11 +31,14 @@ swift build && swift test
 echo "hello" | .build/debug/aishow cast --app com.apple.TextEdit      # 発動: 貼り付け(承認後にのみ使う)
 .build/debug/aishow summon --chant "この会社に音声 SDK の話でコールドメッセージ"   # 召喚 → 承認(y/e/n)→ 発動
 .build/debug/aishow summon --dry-run --chant "..."   # 提案の表示まで(貼り付けなし)
+.build/debug/aishow flame --seconds 4                 # (検収用) 画面の縁に炎を N 秒表示して消える
 
-# メニューバー常駐(ホットキー Option+Space を押しながら話す)
+# メニューバー常駐(⌘ キーを押しながら話す。設定で Fn 長押し / Option+Space 等に変更可)
 make app && open dist/Aishow.app
 ```
 初回起動でマイク / Accessibility / Automation の許可が要る(メニューバーの「状態…」に導線)。`aishow` エージェントは初回 `summon` 時に `harness/spells/*.md` から自動作成・更新される。
+
+詠唱中(ホットキーを押している間)は画面の縁に炎が出る。メニューの「詠唱中に炎の枠を表示」のチェックを外す、または `defaults write com.openhome.aishow flameOverlayEnabled -bool false` で OFF にできる(既定 ON)。
 
 ## 動作の流れ
 1. **索敵**: ホットキー押下の瞬間に最前面アプリ・ウィンドウタイトル・ブラウザ URL・選択テキストを取得(自分の UI を出す前に)

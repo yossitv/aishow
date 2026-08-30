@@ -26,6 +26,10 @@ case "scan":   status = ScanCommand.run(rest)
 case "cast":   status = CastCommand.run(rest)
 case "chant":  status = ChantCommand.run(rest)
 case "summon": status = SummonCommand.run(rest)
+case "flame":
+    MainActor.assumeIsolated {
+        FlameCommand.run(rest) // Never returns
+    }
 case "version", "--version", "-v":
     print("aishow \(Aishow.version)"); status = 0
 case "help", "--help", "-h":
@@ -37,6 +41,7 @@ case "help", "--help", "-h":
       cast [--app A] [--window-title T] 発動: stdin のテキストをカーソル位置に貼り付け(承認後にのみ呼ぶ)
       chant [--file x.wav]              詠唱: 録音 → OpenAI STT → テキスト
       summon [--chant "..."]            召喚: scan → chant → TrueForge → 承認 → cast
+      flame [--seconds N]               (検収用) 画面の縁に炎を N 秒(既定 3)表示して消える
       version / help
     """); status = 0
 default:
