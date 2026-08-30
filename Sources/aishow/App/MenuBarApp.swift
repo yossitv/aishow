@@ -21,6 +21,8 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     private var popover: NSPopover?
     private let state = AppState()
     private let hotKey = HotKey()
+    /// Accessibility 許可待ちのポーリング(許可済みなら nil)。
+    private var accessibilityPollTimer: Timer?
     private let recorder = PushToTalkRecorder()
     private let flame = FlameOverlay()
     private var flameMenuItem: NSMenuItem?
@@ -148,11 +150,29 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         }
         hotKey.onPermissionMissing = { [weak self] in
             Task { @MainActor in
-                self?.state.setError("Accessibility 権限が無いためホットキーを監視できません")
+                self?.state.setError("Accessibility 権限が無いためホットキーを監視できません(許可されると自動で開始します)")
                 self?.showStatusPopover()
+                self?.startWaitingForAccessibility()
             }
         }
         hotKey.start()
+    }
+
+    /// Accessibility が許可されるまで 2 秒ごとに確認し、許可されたらアプリ再起動なしでホットキー監視を始める
+    /// (VoiceInk と同じ挙動。システム設定でトグルをオンにした瞬間に使えるようになる)。
+    private func startWaitingForAccessibility() {
+        guard accessibilityPollTimer == nil else { return }
+        accessibilityPollTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] timer in
+            guard AXIsProcessTrusted() else { return }
+            timer.invalidate()
+            Task { @MainActor in
+                guard let self else { return }
+                self.accessibilityPollTimer = nil
+                self.state.lastError = nil
+                self.state.refreshPermissions()
+                self.hotKey.start()
+            }
+        }
     }
 
     /// 押した瞬間に scan する(自分の UI を出す前)。それから録音開始。
