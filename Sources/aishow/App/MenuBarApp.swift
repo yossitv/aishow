@@ -22,6 +22,8 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
     private let state = AppState()
     /// 設定でホットキーを変えたら作り直す(HotKey は生成時に設定を読む)。
     private var hotKey = HotKey()
+    /// Accessibility 許可待ちのポーリング(許可済みなら nil)。
+    private var accessibilityPollTimer: Timer?
     private let recorder = PushToTalkRecorder()
     /// 詠唱中(録音中)に画面の縁を炎で囲う演出。
     private let flame = FlameOverlay()
@@ -242,11 +244,29 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         }
         hotKey.onPermissionMissing = { [weak self] in
             Task { @MainActor in
-                self?.state.setError("Accessibility permission is required to listen for the hotkey")
+                self?.state.setError("Accessibility permission is required to listen for the hotkey (starts automatically once granted)")
                 self?.showStatusPopover()
+                self?.startWaitingForAccessibility()
             }
         }
         hotKey.start()
+    }
+
+    /// Accessibility が許可されるまで 2 秒ごとに確認し、許可されたらアプリ再起動なしでホットキー監視を始める
+    /// (VoiceInk と同じ挙動。システム設定でトグルをオンにした瞬間に使えるようになる)。
+    private func startWaitingForAccessibility() {
+        guard accessibilityPollTimer == nil else { return }
+        accessibilityPollTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] timer in
+            guard AXIsProcessTrusted() else { return }
+            timer.invalidate()
+            Task { @MainActor in
+                guard let self else { return }
+                self.accessibilityPollTimer = nil
+                self.state.lastError = nil
+                self.state.refreshPermissions()
+                self.hotKey.start()
+            }
+        }
     }
 
     /// 押した瞬間に scan する(自分の UI を出す前)。それから録音開始。
