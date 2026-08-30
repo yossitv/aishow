@@ -2,7 +2,7 @@
 
 > 声で詠唱すると、AI エージェントが現れて仕事をする。
 
-企業サイトの問い合わせフォームを開いたまま `Option+Space` を押して日本語で「この会社に、うちの音声 SDK の話でコールドメッセージ」と言う。
+企業サイトの問い合わせフォームを開いたまま `⌘` キーを長押しして日本語で「この会社に、うちの音声 SDK の話でコールドメッセージ」と言う。
 ローカルの **TrueForge** エージェントが召喚され、いま開いているサイトを特定し、**Bright Data MCP** でそのサイトを調査、**OpenAI** モデルがあなたの文体で英文を書く。**承認**した内容だけがフォームのカーソル位置に入る。送信は人間。
 
 Agent Harness Hackathon(San Francisco, 2026-08-29)提出作品。
@@ -33,7 +33,7 @@ echo "hello" | .build/debug/aishow cast --app com.apple.TextEdit      # 発動: 
 .build/debug/aishow summon --dry-run --chant "..."   # 提案の表示まで(貼り付けなし)
 .build/debug/aishow flame --seconds 4                 # (検収用) 画面の縁に炎を N 秒表示して消える
 
-# メニューバー常駐(ホットキー Option+Space を押しながら話す)
+# メニューバー常駐(⌘ キーを押しながら話す。設定で Fn 長押し / Option+Space 等に変更可)
 make app && open dist/Aishow.app
 ```
 初回起動でマイク / Accessibility / Automation の許可が要る(メニューバーの「状態…」に導線)。`aishow` エージェントは初回 `summon` 時に `harness/spells/*.md` から自動作成・更新される。

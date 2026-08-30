@@ -15,7 +15,7 @@ struct SettingsView: View {
 
     @ObservedObject private var l10n = L10n.shared
 
-    @State private var hotKey: String = UserDefaults.standard.string(forKey: HotKey.modifiersDefaultsKey) ?? "option"
+    @State private var hotKey: String = UserDefaults.standard.string(forKey: HotKey.modifiersDefaultsKey) ?? HotKey.defaultModifiers
     @State private var targetLanguage: String = Preferences.translateTargetLanguage
     @State private var microphoneUID: String = Preferences.microphoneDeviceUID ?? ""
     @State private var microphoneDevices: [AudioInputDevice] = AudioInputDevices.list()
