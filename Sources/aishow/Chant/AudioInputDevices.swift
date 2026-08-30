@@ -24,6 +24,9 @@ enum AudioInputDevices {
     }
 
     /// CoreAudio の UID からデバイス ID を引く。デバイスが抜かれている場合などは nil。
+    ///
+    /// UID は **qualifier** として渡す(`AudioValueTranslation` 構造体を渡す旧形式は現行 macOS で
+    /// `kAudioHardwareBadPropertySizeError('!siz')` になり、常に「見つからない」扱いになっていた)。
     static func deviceID(forUID uid: String) -> AudioDeviceID? {
         guard !uid.isEmpty else { return nil }
         var deviceID = AudioDeviceID(0)
@@ -33,21 +36,16 @@ enum AudioInputDevices {
             mScope: kAudioObjectPropertyScopeGlobal,
             mElement: kAudioObjectPropertyElementMain
         )
-        var size = UInt32(MemoryLayout<AudioValueTranslation>.size)
-        // `AudioValueTranslation` の mInputData / mOutputData に渡すポインタは、呼び出し(AudioObjectGetPropertyData)
-        // が完了するまで生存している必要がある。&uidCF / &deviceID を直接渡すと一時ポインタの寿命が
-        // 呼び出しより短くなり得る(temporary-pointers 警告/未定義動作)ため、withUnsafeMutablePointer で明示的に
-        // 両方の生存期間を呼び出し全体まで延ばす。
+        var size = UInt32(MemoryLayout<AudioDeviceID>.size)
         let status: OSStatus = withUnsafeMutablePointer(to: &uidCF) { uidPtr in
-            withUnsafeMutablePointer(to: &deviceID) { outPtr in
-                var translation = AudioValueTranslation(
-                    mInputData: UnsafeMutableRawPointer(uidPtr),
-                    mInputDataSize: UInt32(MemoryLayout<CFString>.size),
-                    mOutputData: UnsafeMutableRawPointer(outPtr),
-                    mOutputDataSize: UInt32(MemoryLayout<AudioDeviceID>.size)
-                )
-                return AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &translation)
-            }
+            AudioObjectGetPropertyData(
+                AudioObjectID(kAudioObjectSystemObject),
+                &address,
+                UInt32(MemoryLayout<CFString>.size),
+                uidPtr,
+                &size,
+                &deviceID
+            )
         }
         guard status == noErr, deviceID != kAudioObjectUnknown, deviceID != 0 else { return nil }
         return deviceID
